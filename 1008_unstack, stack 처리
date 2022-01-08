@@ -1,0 +1,21 @@
+# [ unstack, stack 처리 ]
+# 1. stack
+# - stack : wide -> long
+# - 컬럼이 index의 하위 레벨로 이동
+# - df1.stack(level = )의 level은 어떤 레벨을 stack할 것인가에 대한 선택지
+
+# 2. unstack
+# - unstack : long -> wide (cross table)
+# - index의 특정 레벨값이 컬럼화
+
+df1 = Series(np.arange(1,5), index = [['A','A','B','B'],['a','b','a','b']])
+df1.unstack()                  # 기본적으로 가장 하위 레벨이 unstack 됨
+df1.unstack(level = 0)         # 레벨 선택 가능(가장 상위 레벨이 unstack 처리 됨)
+
+df2 = df1.unstack()
+df2.stack()                    # 컬럼이 인덱스로 들어감
+
+df3 = DataFrame(np.arange(10,161,10).reshape(2,8), index = ['a','b'], 
+                           columns = [[2007,2007,2007,2007,2008,2008,2008,2008],[1,2,3,4,1,2,3,4]])
+df3.stack()
+df3.stack(level = 0)           # level은 무엇을 stack할 것인가에 대한 선택지
