@@ -1,0 +1,90 @@
+
+# pandas
+# 정형 데이터를 관리하기 위한 모듈
+# 데이터 선택, 정렬, 그룹연산, 수학통계 연산, 문자열 처리...
+# Series, DataFrame
+# =============================================================================
+
+# Series
+# 1차원
+# 서로 다른 데이터 타입 허용 X
+# key-value 구조(key : index)
+# 대부분 벡터 연산 가능
+
+l1 = [1,2,3,4]
+l1 + 1
+
+Series(l1) + 1
+
+# 1. 생성
+s1 = Series([1,2,3,4])
+s2 = Series([1,2,3,4], index = ['a','b','c','d'])  # index가 없는 객체에 index 옵션 사용 : index 부여
+Series(s2, index = ['A','B','C','D'])                     # index가 있는 객체에 index 옵션 사용  reindexing
+
+# [ 참고 : reindex(인덱스 순서 변경) 기능]
+s3 = Series([10,90,10,140,120,101,103], index = ['금','화','수','목','월','토','일'])
+
+Series(s3, index = ['월','화','수','목','금','토','일'])
+s3[['월','화','수','목','금','토','일']]
+s3.reindex(['월','화','수','목','금','토','일'])
+
+s2.reindex(['a','b','c','d','e'])                     # NA리턴
+s2.reindex(['a','b','c','d','e'], fill_value = 0)     # NA가 0으로 수정
+s2.reindex(['a','b','c','d','e'], method = 'ffill')   # NA를 이전값으로 수정
+
+
+# 2. 색인
+s1[0]        # 스칼라 리턴
+s1[0:1]      # 시리즈 리턴(차원 축소 발생 X)
+s1[[0,2]]    # 리스트를 사용한 색인
+s1[s1 >= 2]  # 조건 색인
+
+s2['a']      # 이름색인(key indexing)
+s2['a':'c']  # pandas에서는 문자의 연속적 출력 가능(마지막 범위 포함)
+
+# 3. 연산
+s1 + 1
+s3 = Series([10,20,30,40])
+s4 = Series([10,20,30,40,50])
+
+s1 + s3     # 같은 key값 끼리 연산
+s1 + s4     # 한쪽에만 있는 key는 NA로 출력
+
+s1.reindex([0,1,2,3,4]) + s4.reindex([0,1,2,3,4])
+s1.reindex([0,1,2,3,4]).fillna(0) + s4.reindex([0,1,2,3,4])
+s1.reindex([0,1,2,3,4], fill_value=0) + s4.reindex([0,1,2,3,4])
+
+# 산술 연산 메서드 
+# 단순히 산술연산만 하는게 아니라 NA를 0으로 치환 후 더하기, 기타 더하는 방향 설정.. 기능 추가
+s1.add(s4, fill_value=0)    # 더하기, fill_value : NA를 치환하고 연산 수행
+s1.sub(s4, fill_value=0)    # 빼기
+s1.mul(s4, fill_value=1)    # 곱하기
+s1.div(s4, fill_value=1)    # 나누기
+
+# 4. 기본 메서드
+s1.index = ['a','b','d','e']    # index 출력 및 수정 
+s1.values                       # value 출력 및 수정
+
+s1.dtype  # 데이터 타입
+
+
+# 예제) 
+s3 = Series([10,20,30,40], index = ['a','b','c','d'])
+s4 = Series([100,200,300,400], index = ['c','d','e','f'])
+
+# s3과 s4의 더한값을 출력하세요. 단, 값이 NA가 리턴되지 않도록
+
+s3.add(s4, fill_value = 0)
+
+idx = ['a','b','c','d','e','f']
+s3.reindex(idx, fill_value=0) + s4.reindex(idx, fill_value=0)
+s3.reindex(idx).fillna(0) + s4.reindex(idx).fillna(0)
+
+# python NA 정의
+a1[0,0] = NA         # NA라는 정의된 값이 없음
+a1[0,0] = np.nan     # 숫자형 NA는 float 타입
+
+a1 = a1.astype('float')
+a1[0,0] = np.nan
+
+
