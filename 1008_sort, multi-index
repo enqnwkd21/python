@@ -1,0 +1,261 @@
+10월 8일 
+
+# -*- coding: utf-8 -*-
+run profile1
+# [ 연습 문제 ] 
+# subway2.csv  파일을 읽고
+sub = pd.read_csv('subway2.csv', encoding='cp949', skiprows=1)  # skiprow = [0,3]이런식 가능(첫번쨰, 네번째 스킵)
+sub['전체'] = sub['전체'].fillna(method = 'ffill')
+
+# 1) 시간대별 승차의 총 합
+sub1 = sub.loc[sub['구분'] == '승차',:]
+sub1 = sub1.drop('구분', axis = 1)         # 구분 컬럼 필요 X
+sub1 = sub1.set_index('전체')
+sub1.dtypes
+sub1.sum(axis = 0)
+
+# 2) 역별 하차의 총 합
+sub2 = sub.loc[sub['구분'] == '하차',:]
+sub2 = sub2.drop(['전체','구분'], axis = 1)
+sub2.index = sub1.index         # 승차 하차 역이름 똑같으니 
+sub2.sum(axis = 1)
+
+# 3) 각 시간대별 승차 인원이 가장 많은 역 이름 출력
+sub1.idxmax(axis = 0)                  # 인덱스가 이름을 가지므로 이름 출력
+sub1.values.argmax(axis = 0)           # array 구조로 바꾼 후 위치값 출력 가능 
+
+
+# 4) 하차 인원의 시간대별 각 역의 차지 비율 출력
+sub2.iloc[:,0]/sub2.iloc[:,0].sum() * 100
+
+f1 = lambda x : x / x.sum() * 100
+
+sub3 = sub2.apply(f1, axis = 0)
+sub3.iloc[:,0].sum(axis = 0)            # 100%인거 확인하기
+
+# SORT
+emp = pd.read_csv('emp.csv')
+
+# 1. sort_index
+emp = emp.set_index('EMPNO')
+emp.sort_index(ascending = False)      # axis = 0이 디폴트이므로 index 순서대로 행 재배치
+emp.sort_index(axis = 1)               # axis = 1이면 column을 순서대로 행 재배치
+emp.sort_index(axis = 1, ascending = False) 
+
+
+# 2. sort_values
+emp.sort_values?
+emp.sort_values(by = ,             # 정렬 컬럼
+                ascending = True,  # 정렬 순서
+                ...)
+
+emp.sort_values('SAL', ascending = False)
+emp.sort_values('DEPTNO', ascending = False)
+emp.sort_values(by = ['DEPTNO','SAL'], ascending = [True, False])
+
+
+# [ 연습 문제 ]
+# student.csv 파일을 읽고 성별 컬럼을 추가 (남자, 여자)
+std = pd.read_csv('student.csv', encoding = 'cp949')
+std.dtypes
+f1 = lambda x : str(x)[6]
+a1 = std['JUMIN'].map(f1)                         # 방법 1
+std['성별'] = np.where( a1 == '1','남자','여자')   # 방법 1
+
+vno = std['JUMIN'].astype('str').str[6]           # 방법 2
+vno.replace({'1':'남자', '2':'여자'})              # 방법 2
+
+
+
+# 성별 순서대로 정렬하되, 같은 성별 내에서는 키가 높은 순서대로 정렬
+std2 = std.sort_values(by = ['성별','HEIGHT'], ascending = [True, False])
+std2.loc[:,['NAME','HEIGHT','성별']]           # 결과 확인
+
+
+# multi - index
+# index나 column이 여러 level을 갖는 경우 (상위레벨은 연도, 하위레벨은 지점)
+# 상위레벨의 번호가 0, 하위레벨로 갈수록 1,2,3, ...
+# 특징 level별로 정렬, 그룹핑 연산 가능
+
+# 1. 생성
+df1.columns = [[상위레벨 컬럼명 나열], [하위레벨 컬럼명 나열]]
+df1.columns = [[상위레벨 컬럼명 나열], [두번째 레벨 컬럼명 나열],[세번째 레벨 컬럼명 나열]]
+
+df1 = DataFrame(np.arange(1,17).reshape(4,4))
+df1.columns = ['a','b','c','d']                              # 1-level column
+df1.columns = [['A','A','B','B'],['n1','n2','n1','n2'] ]     # 2-level column
+
+
+df1.index = [['서울','서울','경기','경기'],[2007,2008,2007,2008] ]
+
+df1.index.names = ['지역','년도']
+df1.columns.names = ['지점','제품']
+
+
+# [ 연습 문제 ]
+# multi_index.csv 파일을 읽고 멀티 인덱스를 갖는 데이터프레임 생성
+df2 = pd.read_csv('multi_index.csv', encoding = 'cp949')
+
+# step1) 첫번째 컬럼을 NA 수정
+df2.iloc[:,0] = df2.iloc[:,0].fillna(method = 'ffill')
+
+# step2) 멀티 인덱스 설정
+df2 = df2.set_index(['Unnamed: 0','Unnamed: 1'])
+
+# step3) 멀티 인덱스 이름 설정
+df2.index.names = ['지역','지점']
+
+# step4) 멀티 컬럼 설정
+idx1 = df2.columns.map(lambda x : NA if 'Unnamed' in x  else x)
+idx1.fillna(method = 'ffill')            # index object에는 fillna가 Series와 DataFrame에서 호출하는 것과 달라서
+                                         # method라는 옵션 사용 불가 => Series로 바꿔서 옵션 적용하기
+                                         
+idx2 = Series(idx1).fillna(method = 'ffill')
+df2.columns = [idx2 ,df2.iloc[0,:]]
+
+# step5) 첫번째 행 제거
+df2.drop(NA)            # NA를 이름으로 가져도 drop 할 수 있음(행이름이 NA인 경우 제거)
+
+df2 = df2.iloc[1:,:]
+
+# step6) 멀티 컬럼이름 변경
+df2.columns.names = ['상품','구분']
+
+
+
+# 2. 색인(xs)
+# - 멀티 인덱스가 설정되어 있는 경우 하위 레벨로의 직접 색인이 가능
+
+df1['A']          # 상위 컬럼 색인 가능
+df1['n1']         # 하위 컬럼 색인 불가능
+
+df1.iloc[:, [0,2]]   # 위치 색인으로 각각 위치 전달해서 특정 하위레벨 값 선택 가능(n1만 선택)
+
+df1.loc[:,'A']       # 상위레벨 컬럼 색인 가능
+df1.loc[:,'n1']      # 하위레벨 컬럼 색인 불가
+
+df1.loc['서울', :]   # 상위레벨 인덱스 색인 가능
+df1.loc[2007, :]     # 하위레벨 인덱스 색인 가능
+
+df1.xs('n1', axis = 1, level = 1)                            # 차원 축소 발생
+df1.xs('n1', axis = 1, level = 1, drop_level = False)        # 차원 축소 발생 X
+
+df1.xs(2007, axis = 0, level =1).xs('n1', axis = 1, level = 1)
+df1.xs?
+
+# axis의 의미 -> 어느 방향가서 찾을래?(축)
+# 0 : 인덱스 1: 컬럼
+# level의 의미
+# 0 : 상위 1: 하위
+
+# 상위레벨과 하위레벨 색인값으로 동시 전달
+# 예) df1 데이터 프레임의 A의 n1선택
+df1['A']['n1']
+df1['A'].xs('n1', axis = 1)
+df1.iloc[:,0]
+df1.loc[:,('A','n1')]               # loc에서 튜플을 사용하여 레벨 색인값을 순차적으로 전달 가능
+
+df1.loc[:,[('A','n1'),('B','n2')]]  # 리스트를 사용하여 순차적 색인을 여러 값 전달 가능
+
+
+# [ 연습 문제 ]
+# multi_index_ex1.csv 파일을 읽고
+df3 = pd.read_csv('multi_index_ex1.csv', encoding = 'cp949')
+
+# 1) 멀티 인덱스 설정
+df3 = df3.set_index(['지역','지역.1'])
+df3.index.names = ['대분류','소분류']
+
+v1 = df3.columns.map(lambda x : x[:2])
+df3.columns = [v1 ,df3.iloc[0,:]] 
+df3 = df3._drop_axis('지점', axis = 0, level = 0)
+
+df3.columns.names = ['지역','지점']
+
+df3.dtypes
+
+# 2) 서울 지역의 C지점의 냉장고의 판매량 선택
+df3.loc[('가전','냉장고'),('서울','C')]
+
+# 3) 각 지역의 A 지점의 가전에 대한 판매량 선택
+df3.xs('A', axis = 1 , level = 1, drop_level = False)
+df3.columns
+df3.xs('가전', axis = 0, level = 0).xs('A', axis = 1, level = 1, drop_level = False)
+
+
+# 4) 강원지역의 A지점과 C지점에 대한 전체 제품 판매량 선택
+df3.loc[:,[('강원','A'),('강원','C')]]   # 수정 가능
+df3['강원'][['A','C']]                   # 주의 : 색인은 가능하나 수정 불가
+
+
+
+# 멀티 인덱스의 정렬
+df1.sort_values(by = 'B')    # 상위컬럼이 중복값을 가지고 있으므로 정렬 불가
+                             # ValueError: The column label 'B' is not unique.
+                             
+df1.sort_values(by = ('B','n1'), ascending = False)                             
+
+df1.sort_index(axis = 0, level = 0)                                    # 레벨0로만 정렬
+df1.sort_index(axis = 0, level = 1, ascending = False)                 # 레벨1만 가지고 정렬 수행
+df1.sort_index(axis = 0, level = [0,1], ascending = [True, False])     # 레벨0 먼저 정렬 후, 레벨1 정렬
+
+
+# 멀티 인덱스에서의 산술연산
+df1.sum(axis = 0)
+df1.sum(axis = 1)
+
+df1.sum(axis = 0, level = 0)      # 세로 방향으로 연산하면서 level 0의 값이 같은 값끼리 그룹핑
+                                  # 인덱스에 level 0값이 서로 같을 경우 합해라 
+df1.sum(axis = 0, level = 1)
+
+
+# 멀티 인덱스에서의 레벨 교체
+dir(df5)
+df1.swaplevel(레벨번호,  # 주축번호, 레벨번호끼리 순서 상관 X
+              레벨번호,
+              axis = 0)
+
+df1.sort_index(axis = 1, level = [1,0]).swaplevel(0,1,axis=1)
+df1.sort_index(axis = 1, level = [1,0])  # axis = 1은 컬럼을 의미
+                                         # level = [1,0]은 1-level로 sort를 할 것이라는 의미
+                                         # swaplevel(0,1,axis=1) 은 축의 레벨 0,1을 교체 할 것이라는 의미
+                                   
+df1.sort_index(axis = 1, level = [1,0]).swaplevel(1,0,axis=1)
+
+
+# [연습 문제]
+# 1. 교습현황.csv 파일을 읽고
+df1 = pd.read_csv('교습현황.csv', encoding = 'cp949', skiprows = 1)
+
+# -- 불필요 컬럼 제거
+df1.columns
+df1 = df1.drop(['교습소주소','교습계열', '분야구분'], axis = 1)
+
+# -- 멀티 인덱스 설정
+df1 = df1.set_index(['교습과정','교습소명'])
+
+# -- 멀티 컬럼 설정
+c1 = df1.columns.str[:4].astype('int')
+
+'2016(11)'.split('(')[1].split(')')[0]
+c2 = df1.columns.map(lambda x : int(x.split('(')[1].split(')')[0]))
+
+# -- 분기 설정
+c3 = np.where(c2 <= 3, 1, np.where(c2 <= 6, 2, np.where(c2 <= 9, 3, 4)))
+Series(c2).replace([1,2,3],1).replace([4,5,6],2).replace([7,8,9],3).replace([10,11,12],4) # 또 다른 방법
+
+df1.columns =[c1,c3,c2]
+
+# -- 천 단위 구분 기호 제거
+f2 = lambda x: int(x.replace(',',''))
+df1 = df1.applymap(f2)
+df1.dtypes
+
+
+# 1) 교습과정별 분기별 교습 금액의 총 합 출력
+df1.sum(axis = 0, level = 0).sum(axis = 1, level = 1)
+
+# 2) 연도별 교습금액이 가장 높은 교습소 이름 출력
+df2 = df1.sum(axis = 0, level = 1).sum(axis = 1, level = 0)
+df2.idxmax(axis = 0)
+
