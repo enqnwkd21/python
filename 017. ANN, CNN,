@@ -1,0 +1,189 @@
+# ANN Regressor
+# 마지막 노드 한 개(하나의 노드가 최종 Y의 신호의 크기가 되도록 설계)
+# 마지막 층에는 마지막 노드의 신호가 최종 Y가 되므로 활성화 함수가 필요 없음
+# 회귀분석에서 주로 사용하는 오차 함수는 MSE, RMSE
+# 기존 회귀와는 다르게 회귀 계수를 확인하여 인과 관계를 해석할 수 없음
+# 기존 회귀와는 다르게 통계적으로 모델, 회귀 계수에 대한 유의성 검정 할 수 없음
+
+# [ 예제 - 보스턴 주택 가격 데이터 ]
+# [ ANN - boston data set ]
+run profile1
+
+import tensorflow as tf
+import keras
+
+from keras.models import Sequential
+from keras.layers.core import Dense
+
+# 1. data loading
+from sklearn.datasets import load_boston
+boston =  load_boston()
+boston_x = boston['data']
+boston_y = boston['target']
+
+# 2. scailing
+from sklearn.preprocessing import StandardScaler as standard
+m_sc = standard()
+boston_x_sc = m_sc.fit_transform(boston_x)
+
+# 3. data split
+from sklearn.model_selection import train_test_split
+train_x, test_x, train_y, test_y = train_test_split(boston_x_sc, boston_y, random_state=0)
+
+# 4. modeling
+# square function
+def r_square(y_true, y_pred):
+    from keras import backend as K
+    SSE =  K.sum(K.square(y_true - y_pred))          # (y - yhat)^2
+    SST = K.sum(K.square(y_true - K.mean(y_true)))   # (y - ybar)^2
+    return (1 - SSE/(SST + K.epsilon()))
+
+nx = train_x.shape[1]
+
+# 모델 설계
+model = Sequential()
+model.add(Dense(52, input_dim = nx, activation = 'relu'))
+model.add(Dense(26, activation = 'sigmoid'))
+model.add(Dense(13, activation = 'relu'))
+model.add(Dense(1))
+
+
+# 모델 컴파일
+model.compile(loss='mean_squared_error', 
+              optimizer='adam',
+              metrics=['mean_squared_error', r_square])
+
+# stopping rule 
+from keras.callbacks import EarlyStopping
+earlystopping = EarlyStopping(monitor='val_loss', patience=10)    
+
+# model save
+import os
+MODEL_DIR = './model/'
+
+if not os.path.exists(MODEL_DIR) :      # ./model 디렉토리가 현재 없다면 새로 생성
+    os.mkdir(MODEL_DIR)
+    
+modelpath='./model/{epoch:02d}-{val_loss:.4f}.hdf5'    
+
+from keras.callbacks import ModelCheckpoint
+checkpointer = ModelCheckpoint(filepath = modelpath, monitor = 'val_loss', 
+                               save_best_only=True, verbose = 1) 
+
+model.fit(train_x, train_y, epochs=1000, batch_size=10,
+          validation_split=0.25, callbacks = [earlystopping, checkpointer])
+
+model.evaluate(test_x, test_y)    # 78.91
+
+
+# 다른 모델 비교
+from sklearn.ensemble import RandomForestRegressor as rf_r
+m_rfr = rf_r()
+m_rfr.fit(train_x, train_y)
+m_rfr.score(test_x, test_y)       # 79.47
+
+
+# [ mnist data - CNN ]
+from keras.datasets import mnist
+from keras.utils import np_utils
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
+from keras.callbacks import ModelCheckpoint,EarlyStopping
+
+seed = 0
+np.random.seed(seed)
+tf.random.set_seed(seed)
+
+# 1. data loading
+(X_train, Y_train), (X_test, Y_test) = mnist.load_data()
+
+X_train.shape    # (60000, 28, 28)
+Y_train.shape    # (60000, )
+
+X_train.reshape(60000, 28*28)      # ANN 모델의 학습 형태
+X_train.reshape(60000, 28, 28)     # CNN 모델의 학습 형태
+X_train.reshape(60000, 28, 28, 1)  # CNN 모델의 학습 형태(흑백처리)
+
+X_train = X_train.reshape(X_train.shape[0], 28, 28, 1).astype('float') / 255
+X_test = X_test.reshape(X_test.shape[0], 28, 28, 1).astype('float') / 255
+Y_train = np_utils.to_categorical(Y_train)
+Y_test = np_utils.to_categorical(Y_test)
+
+# 컨볼루션 신경망 설정
+model = Sequential()
+model.add(Conv2D(32, kernel_size=(3, 3), input_shape=(28, 28, 1), activation='relu'))
+model.add(Conv2D(64, (3, 3), activation='relu'))
+model.add(MaxPooling2D(pool_size=2))
+model.add(Dropout(0.25))
+model.add(Flatten())
+model.add(Dense(128, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(10, activation='softmax'))
+
+model.compile(loss='categorical_crossentropy',
+              optimizer='adam',
+              metrics=['accuracy'])
+
+# 모델 최적화 설정
+MODEL_DIR = './model/'
+
+if not os.path.exists(MODEL_DIR):
+    os.mkdir(MODEL_DIR)
+
+modelpath="./model/{epoch:02d}-{val_loss:.4f}.hdf5"
+
+checkpointer = ModelCheckpoint(filepath=modelpath, monitor='val_loss', verbose=1, save_best_only=True)
+
+early_stopping_callback = EarlyStopping(monitor='val_loss', patience=5)
+
+# 모델 실행
+history = model.fit(X_train, Y_train, validation_data=(X_test, Y_test), 
+                    epochs=30, batch_size=200, verbose=0, 
+                    callbacks=[early_stopping_callback,checkpointer])
+
+
+# 테스트 정확도 출력 
+print("\n Test Accuracy: %.4f" % (model.evaluate(X_test, Y_test)[1]))
+
+# 테스트셋의 오차
+y_vloss = history.history['val_loss']
+
+# 학습셋의 오차
+y_loss = history.history['loss']
+
+# 그래프로 표현
+import matplotlib.pyplot as plt
+x_len = np.arange(len(y_loss))
+plt.plot(x_len, y_vloss, marker='.', c="red", label='Testset_loss')
+plt.plot(x_len, y_loss, marker='.', c="blue", label='Trainset_loss')
+
+# 그래프에 그리드를 주고 레이블을 표시
+plt.legend(loc='upper right')
+plt.grid()
+plt.xlabel('epoch')
+plt.ylabel('loss')
+plt.show()
+
+# 예측 결과 확인하기
+output = model.predict(X_test)    # 0과 1로만 리턴이 되야 함
+np.round(output)                  # 정수로 반올림하면 0과 1의 신호로 보여짐
+
+output_y = output.argmax(axis=1)
+y_true = Y_test.argmax(axis=1)
+
+# 예측결과와 실제값이 다른 경우 확인
+(output_y != y_true).sum()                         # 79개가 예측값과 실제값이 다름을 확인
+
+X_test_raw = X_test.reshape(X_test.shape[0], 28, 28)
+
+plt.imshow(X_test_raw[output_y != y_true][0])      # 실제 그림
+output_y[output_y != y_true][0]                    # 모델에 의한 예측 값
+y_true[output_y != y_true][0]                      # 실제 값
+
+plt.imshow(X_test_raw[output_y != y_true][1])      # 실제 그림
+output_y[output_y != y_true][1]                    # 모델에 의한 예측 값
+y_true[output_y != y_true][1]                      # 실제 값
+
+plt.imshow(X_test_raw[output_y != y_true][2])      # 실제 그림
+output_y[output_y != y_true][2]                    # 모델에 의한 예측 값
+y_true[output_y != y_true][2]                      # 실제 값
