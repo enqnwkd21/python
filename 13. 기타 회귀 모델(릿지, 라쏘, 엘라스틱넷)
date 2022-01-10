@@ -1,0 +1,177 @@
+# 기타 회귀 모델(릿지, 라쏘, 엘라스틱넷)
+# 회귀 모델에서 다중공선성의 문제를 해결하기 위한 용도로 주로 사용
+# 가중치 규제(L1, L2 규제)를 통해 회귀 모델을 제어하는 형식
+# 가중치 규제 강도(alpha)의 조절을 통해 모델의 복잡도 제어
+# alpha가 클수록 가중치가 작아짐
+
+from sklearn.datasets import load_boston
+boston = load_boston()
+boston_x = boston['data']
+boston_y = boston['target']
+
+from sklearn.model_selection import train_test_split
+train_x, test_x, train_y, test_y = train_test_split(boston_x, boston_y, random_state=0)
+
+# 1. 릿지(Ridge)
+# L2 규제를 사용한 가중치 제어
+# 각 가중치의 제곱의 합을 최소화 하는 방식
+
+from sklearn.linear_model import Ridge
+m_rg = Ridge()                  # alpha = 1.0
+m_rg.fit(train_x, train_y)
+m_rg.score(test_x, test_y)      # 62.66
+
+m_rg2 = Ridge(alpha = 0.001)
+m_rg3 = Ridge(alpha = 100)
+
+m_rg2.fit(train_x, train_y)
+m_rg3.fit(train_x, train_y)
+
+m_rg2.score(test_x, test_y)   # alpha = 0.001(기존1보다 작은값 => 규제완화 => 가중치 크기 커짐 => 모델 복잡도 증가)
+m_rg3.score(test_x, test_y)   # alpha = 100(기존값보다 큰값 => 규제강화 => 계수 크기 작아짐 => 모델 복잡도 감소)
+
+# 계수 확인
+m_rg.coef_         # 설명변수에 대한 회귀 계수
+m_rg3.coef_         # 설명변수에 대한 회귀 계수
+
+m_rg.intercept_    # 절편
+
+import matplotlib.pyplot as plt
+plt.plot(m_rg.coef_, '^', label='ridge alpha 1')
+plt.plot(m_rg2.coef_, 'v', label='ridge alpha 0.001')
+plt.plot(m_rg3.coef_, '*', label='ridge alpha 100')
+plt.legend()
+
+# alpha가 클수록 규제 강도가 강화 =>
+# 설명력이 떨어지는 변수에 대한 가중치(계수)를 0에 가깝게 수정
+# 더 단순한 모델 생성
+
+# alpha에 대한 강도 확인!!
+vscore_tr = [] ; vscore_te = []
+
+for i in [0.001, 0.01, 0.1, 1, 10, 100, 1000] :
+    m_rg = Ridge(alpha=i)
+    m_rg.fit(train_x, train_y)
+    vscore_tr.append(m_rg.score(train_x, train_y))
+    vscore_te.append(m_rg.score(test_x, test_y))
+    
+import matplotlib.pyplot as plt    
+plt.plot(vscore_tr, label='train', c='red')
+plt.plot(vscore_te, label='test', c='blue')
+plt.legend()
+plt.xticks(np.arange(0,7), [0.001, 0.01, 0.1, 1, 10, 100, 1000])
+
+# 2. 라쏘(Lasso)
+# L1 규제를 사용한 가중치 제어
+# 가중치의 절댓값의 합을 최소화 방식 규제
+from sklearn.linear_model import Lasso
+
+m_ls = Lasso()                 # alpha 1
+m_ls2 = Lasso(alpha=10)                
+m_ls3 = Lasso(alpha=100)               
+
+m_ls.fit(train_x, train_y)
+m_ls2.fit(train_x, train_y)
+m_ls3.fit(train_x, train_y)
+
+m_ls.score(test_x, test_y)
+m_ls2.score(test_x, test_y)
+m_ls3.score(test_x, test_y)
+
+(m_ls.coef_ == 0).sum()        # 추정된 회귀 계수가 0인 변수가 2개(2개 변수의 탈락 발생)
+(m_ls2.coef_ == 0).sum()       # 추정된 회귀 계수가 0인 변수가 2개(2개 변수의 탈락 발생)
+(m_ls3.coef_ == 0).sum()       # 추정된 회귀 계수가 0인 변수가 2개(2개 변수의 탈락 발생)
+
+
+# 3. 엘라스틱넷
+# L1 + L2 규제 혼합 방식
+# L1, L2 규제의 강도 조절 가능
+
+from sklearn.linear_model import ElasticNet
+m_el = ElasticNet(l1_ratio=0.5)
+m_el.fit(train_x, train_y)
+m_el.score(test_x, test_y)
+
+# [ 연습문제 - 자동차 연비 예측 ]
+# auto-mpg.csv 파일을 읽고 연비(mpg)를 예측하는 회귀 모델 생성
+
+# 데이터 로딩
+df1 = pd.read_csv('auto-mpg.csv')
+df1.dtypes
+df1 = df1.drop('car name', axis=1)
+df1.columns = df1.columns.str.replace(' ','_')    # 컬럼이름에 공백을 포함하는 경우 '_'로 변경
+
+# 결측치 처리
+df1['horsepower'] = df1['horsepower'].replace('?', NA)
+df1['horsepower'] = df1['horsepower'].astype('float')
+
+# NA 확인
+df1.isna().sum()      # 각 컬럼별 NA의 개수
+df1 = df1.dropna()    # 결측치를 포함하는 행 데이터 제거
+
+# 데이터 탐색
+pd.plotting.scatter_matrix(df1, hist_kwds = {'bins' : 20})
+
+# data split
+from sklearn.model_selection import train_test_split
+df_x = df1.drop('mpg', axis=1)
+df_y = df1['mpg']
+
+train_x, test_x, train_y, test_y = train_test_split(df_x, df_y, random_state=0)
+
+# ols fitting
+from statsmodels.formula.api import ols
+fml = 'mpg ~' + '+'.join(df_x.columns)
+m_lm = ols(fml, data=df1).fit()
+print(m_lm.summary())
+
+# VIF
+from statsmodels.stats.outliers_influence import variance_inflation_factor as vif
+vvif = [ vif(df_x.values, i) for i in range(df_x.shape[1]) ]
+Series(vvif, index=df_x.columns)
+
+# PCA
+from sklearn.preprocessing import StandardScaler as standard
+m_sc1 = standard()
+df_x_sc = m_sc1.fit_transform(df_x)
+
+from sklearn.decomposition import PCA
+m_pca = PCA(7)
+df_x_sc_pca = m_pca.fit_transform(df_x_sc)
+
+df_x_sc_pca = DataFrame(df_x_sc_pca, columns=['C1','C2','C3','C4','C5','C6','C7'])
+df_new = pd.merge(df_x_sc_pca, df_y, right_index=True, left_index=True)
+
+fml = 'mpg ~' + '+'.join(['C1','C2','C3','C4','C5','C6','C7'])
+m_lm = ols(fml, data=df_new).fit()
+print(m_lm.summary())
+
+# lasso
+m_ls = Lasso()
+m_ls.fit(train_x, train_y)
+
+m_ls.score(train_x, train_y)
+m_ls.score(test_x, test_y)
+
+# alpha에 대한 강도 확인!!
+vscore_tr = [] ; vscore_te = []
+
+for i in [0.001, 0.01, 0.1, 1, 10, 100, 1000] :
+    m_rg = Lasso(alpha=i)
+    m_rg.fit(train_x, train_y)
+    vscore_tr.append(m_rg.score(train_x, train_y))
+    vscore_te.append(m_rg.score(test_x, test_y))
+    
+import matplotlib.pyplot as plt    
+plt.plot(vscore_tr, label='train', c='red')
+plt.plot(vscore_te, label='test', c='blue')
+plt.legend()
+plt.xticks(np.arange(0,7), [0.001, 0.01, 0.1, 1, 10, 100, 1000])
+
+# re-modeling
+m_ls = Lasso(alpha=0.01)
+m_ls.fit(train_x, train_y)
+m_ls.score(train_x, train_y)
+m_ls.score(test_x, test_y)
+
+m_ls.coef_
