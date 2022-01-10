@@ -1,0 +1,87 @@
+# knn
+
+# Y가 범주형인 지도 학습의 형태
+# 거리기반 모델 
+# 결측치와 이상치에 민감
+# 변수 스케일링 필요 (국어 점수에서의 1점, 수학 점수에서의 1점의 차이는 다름)
+# 모델링에 사용되는 변수의 조합 중요!
+# 이산형 데이터가 많을수록 불리
+
+# 0. 모듈 호출(sklearn.neighbors은 외우기)
+from sklearn.neighbors import KNeighborsClassifier as knn
+import sklearn.neighbors  # dir(sklearn.neighbors) 하고 함수 가져오기
+
+# 1. data set split (test하기 위해) (sklearn.model_selection 외우기)
+# train_test_split 함수를 사용하여 train data set과 test data set으로 나눔
+# 기본적으로 75 : 25 비율로 추출
+
+from sklearn.model_selection import train_test_split
+train_x, test_x, train_y, test_y = train_test_split(iris['data'],      # 원본의 설명변수
+                                                    iris['target'],    # 원본의 종속변수
+                                                    random_state = 0)  # random 규칙을 고정시키겠다(0이라는 숫자는 의미X, 시드값을 특정 숫자로 정하고 기준값으로 해서 랜덤하게 나름 규칙적으로 샘플, 추출되는 데이터 셋은 고정)
+                                                                       
+
+
+train_x, test_x, train_y, test_y = train_test_split(iris['data'],     # 원본의 설명변수
+                                                    iris['target'],   # 원본의 종속변수
+                                                    train_size = 0.7, # 비율 조정 가능
+                                                    random_state = 0) 
+
+test_x.shape  # 112 rows
+
+# -- cancer 예시
+cancer = pd.read_csv('cancer.csv')
+cancer_x = cancer.iloc[:,2:]
+cancer_y = cancer.iloc[:,1]
+
+train_x, test_x, train_y, test_y = train_test_split(cancer_x,    # 원본의 설명변수
+                                                    cancer_y,    # 원본의 종속변수
+                                                    random_state = 0) 
+
+
+# 2. modeling
+m_knn = knn(n_neighbors = 3)   # 모델 정의 단계 : 빈 모델 형성
+                               # k의 개수(n_neighbors)에 따라 예측 정확도가 달라질 수 있음
+m_knn.fit(train_x, train_y)    # 모델에 데이터셋 훈련(훈련용 데이터 셋 사용) = 한 건 한 건 데이터한테 학습 시킴(train data set으로만 해야 함, 덮어쓰기 X)
+m_knn.score(test_x, test_y)    # 모델에 대한 평가(평가용 데이터 셋을 사용) 
+
+# [ 참고 - score 메서드 내부 연산 ]
+(m_knn.predict(test_x) == test_y).sum() / test_y.shape[0] * 100
+(m_knn.predict(test_x) == test_y).sum() / len(test_x) * 100
+
+
+# 3. predict (전달되는 데이터는 2차원 형태!)
+new_data = np.array([3.6, 5.9, 1.3, 0.7])
+m_knn.predict(new_data)                # Error : predict에서 요구하는 data set은 2차원인데 new_data는 1차원
+m_knn.predict(new_data.reshape(1,-1))  # 1,4로 맞춰준 것 =>  array([0]) : 0번째 Y값!, 
+                                       # but 만약에 new_data = np.array([[3.6, 5.9, 1.3, 0.7]]) 2차원으로 만들어줬으면    
+                                       # reshape할 필요 X
+iris['target_names'][0]
+# -- vpre가 더 있어보이니깐~
+vpre = m_knn.predict(new_data.reshape(1,-1)) 
+iris['target_names'][vpre][0]          # 실제 이름 확인 => [0]를 전달하는 이유는  array(['setosa'], dtype='<U10') -> 'setosa'
+
+
+
+# 4. 튜닝
+# 최적의 k의 수 확인 !! 
+# (정수 포지션일때만 확인하면 됨, train이 더 높고, train과 test gap이 별로 없는게 best)
+
+# -- cancer 예시
+cancer = pd.read_csv('cancer.csv')
+cancer_x = cancer.iloc[:,2:]
+cancer_y = cancer.iloc[:,1]
+
+train_x, test_x, train_y, test_y = train_test_split(cancer_x,    # 원본의 설명변수
+                                                    cancer_y,    # 원본의 종속변수
+                                                    random_state = 0) 
+vscore_tr = [];vscore_te = []
+for i in range(1, 11) :
+    m_knn = knn(n_neighbors = i)  
+    m_knn.fit(train_x, train_y)   
+    vscore_tr.append(m_knn.score(train_x, train_y)) 
+    vscore_te.append(m_knn.score(test_x, test_y)) 
+    
+plt.plot(range(1, 11), vscore_tr, label = 'train_score', c = 'r')
+plt.plot(range(1, 11), vscore_te, label = 'test_score', c = 'b')
+plt.legend()
