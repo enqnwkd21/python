@@ -1,0 +1,139 @@
+# MDS(다차원척도법)
+# - 비지도학습
+# - 기존 데이터들이 갖는 분포적 특성(데이터간 거리)을 최대한 유지하는 인공변수 유도
+# - 다차원 척도법에 의해 유도된 인공변수 평가 : 기존의 데이터간 거리와 유도된 변수로 계산된 거리의차이(STRESS)
+# - stress가 클수록 좋지 않은 모델
+
+# [ 예제 - iris data set을 사용하여 차원축소(MDS) ]
+# 1. data loading
+from sklearn.datasets import load_iris
+iris = load_iris()
+iris_x = iris['data']
+iris_y = iris['target']
+
+# 2. data scaling
+from sklearn.preprocessing import StandardScaler as standard
+m_sc = standard()
+iris_x_sc = m_sc.fit_transform(iris_x)
+
+# 3. MDS
+from sklearn.manifold import MDS
+
+# 1) 2개 인공변수 유도
+m_mds1 = MDS(n_components=2, random_state=0)        
+iris_x_sc_mds1 = m_mds1.fit_transform(iris_x_sc)                    
+   
+# 2) 3개 인공변수 유도
+m_mds2 = MDS(n_components=3, random_state=0)        
+iris_x_sc_mds2 = m_mds2.fit_transform(iris_x_sc) 
+
+# 4. 시각화
+# 1) 2개 인공변수 시각화
+import mglearn
+mglearn.discrete_scatter(iris_x_sc_mds1[:,1], iris_x_sc_mds1[:,0], y = iris_y)
+
+
+# 2) 3개 인공변수 시각화
+from mpl_toolkits.mplot3d import Axes3D, axes3d
+pig1 = plt.figure()
+ax = Axes3D(pig1)
+
+ax.scatter(iris_x_sc_mds2[:,0],    
+           iris_x_sc_mds2[:,1],     
+           iris_x_sc_mds2[:,2],     
+           c = iris_y,             
+           cmap = plt.spring(),     
+           s = 60,                  
+           edgecolors = 'k')
+
+# 5. 평가(stress) - 절대적 평가 기준이 없음 (데이터가 많을수록 커짐) => elbow point 확인 용도
+#                 - 몇개의 인공변수를 유도할지 보기 위해 스트레스를 계산 
+m_mds1.stress_    # 235.945
+m_mds2.stress_    # 10.509
+
+# sklearn stress
+import numpy as np
+from sklearn.metrics import euclidean_distances  # 유클리디안 거리
+
+DA = euclidean_distances(iris_x)             # 원본데이터의 거리
+DE1= euclidean_distances(iris_x_sc_mds1)     # 변환된 데이터 셋끼리의 거리
+DE2= euclidean_distances(iris_x_sc_mds2)
+
+stress1 = np.sum((DE1 - DA)**2)*0.5         # 3521.2042
+stress2 = np.sum((DE2 - DA)**2)*0.5         # 3378.1498
+
+# kruskal stress(절대적 평가 기준 마련)
+stress1/(0.5 * np.sum(DA**2))        # 2개로 유도된 인공변수의 stress 지수 => 0.034
+stress2/(0.5 * np.sum(DA**2))        # 3개로 유도된 인공변수의 stress 지수 => 0.033
+
+# 0 < 0.025 : 완벽
+#   < 0.05  : 매우 좋음
+#   < 0.1   : 좋음
+#   < 0.2   : 보통
+#   > 0.2   : 나쁨
+ 
+
+# [ 연습 문제 = cancer data set을 사용하여 차원축소(MDS)]
+# 1. data loading
+from sklearn.datasets import load_breast_cancer
+cancer = load_breast_cancer()
+cancer_x = cancer['data']
+cancer_y = cancer['target']
+
+# 2. data scaling
+from sklearn.preprocessing import StandardScaler as standard
+m_sc = standard()
+cancer_x_sc = m_sc.fit_transform(cancer_x)
+
+# 3. MDS
+from sklearn.manifold import MDS
+
+
+m_mds1 = MDS(n_components=2, random_state=0)    
+m_mds2 = MDS(n_components=3, random_state=0) 
+    
+cancer_x_sc_mds1 = m_mds1.fit_transform(cancer_x_sc)                    
+cancer_x_sc_mds2 = m_mds2.fit_transform(cancer_x_sc) 
+
+# 4. 시각화
+import mglearn
+mglearn.discrete_scatter(cancer_x_sc_mds1[:,0], cancer_x_sc_mds1[:,1], y = cancer_y)
+
+
+# 2) 3개 인공변수 시각화
+from mpl_toolkits.mplot3d import Axes3D, axes3d
+pig1 = plt.figure()
+ax = Axes3D(pig1)
+
+ax.scatter(cancer_x_sc_mds2[:,0],    
+           cancer_x_sc_mds2[:,1],     
+           cancer_x_sc_mds2[:,2],     
+           c = cancer_y,             
+           cmap = plt.spring(),     
+           s = 60,                  
+           edgecolors = 'k')
+
+# 5. 적절한 인공변수 수 확인(stress계산)
+# 1) model stress
+vstress_mo = [];vstress_kr = []
+for i in range(1,31):
+    m_mds = MDS(n_components=i, random_state=0)                      
+    cancer_x_sc_mds = m_mds.fit_transform(cancer_x_sc) 
+    
+    # model stress 확인
+    vstress_mo.append(m_mds.stress_)
+ 
+    # kruskal stress 확인
+    DA = euclidean_distances(cancer_x)             
+    DE = euclidean_distances(cancer_x_sc_mds)     
+    
+    stress = np.sum((DE - DA)**2)*0.5  
+    vstress_kr.append(stress / (np.sum(DA**2)*0.5))   # 거리의 표준화 => 절대적 기준치 출력 가능
+
+# elbow point 확인
+plt.plot(range(1,31), vstress_mo)  # 5시점 이후부터는 급격한 변화는 확인 X => 5~7개수의 인공변수 유도 적절!!
+
+# kruskal_stress 확인
+df_stress = DataFrame({'n_components': np.arange(1,31),'kruskal_stress':vstress_kr})
+
+plt.plot(range(1,31), vstress_kr)
