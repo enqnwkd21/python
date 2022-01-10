@@ -1,0 +1,181 @@
+# SVM 
+# - 원래는 분류 목적으로 수행하는 예측 모델링 기법이나 회귀를 수행해주기도 함
+# - 분류 기준(분류선, 분류평면)을 찾는 모델, 분류선으로 부터 거리(마진)이 커야 분류가 good
+# - 분류선과 분류평면을 만들기 위해 오차를 최소화하는 각 기울기와 절편 구함(회귀와 유사)
+# - 예측력이 강하고 과적합이 되기 쉽지 않은 모델
+# - 계산 수식이 너무 복잡, 해석 불가, 학습 비용이 큰 모델
+# - 학습되는 변수의 형태에 큰 영향받음(사전 변수 선택 필수)
+# - 변수 스케일링 필요
+# - 이상치에 민감
+
+
+# 용어 정리
+# 1. support vector(지지 벡터) : 분류기준을 지지하는 데이터포인트
+# 2. 초평면 : 다차원일때(3차원 이상) 분류 기준이 되는 평면(판)
+# 3. 결정정계 : 두 클래스를 분류하는 경계
+# 4. 마진 : 초평면으로부터의 서포트 벡터까지의 거리
+# 5. 슬랙 변수 : 완벽한 분류가 불가능할 때 선형적으로 분류하기 위해허용되는 오차를 위한 변수
+
+# 예제 - SVM 초평면 유도 과정
+# 1. data loading
+from sklearn.datasets import make_blobs
+X, y = make_blobs(centers=4, random_state=8)
+
+X.shape     # 100 X 2 (2개의 설명변수)
+y           # 0,1,2,3의 값을 가짐
+
+y = y % 2   # 이진 분류 모델을 만들기 위한 작업(2로 나눈 나머지) 
+            # => 이진 분류기가 가장 효과적이라는 것이지 다항분류여도 충분히 분류 가능
+
+
+# 2. 데이터 분포 확인
+import mglearn
+mglearn.discrete_scatter(X[:,0], X[:,1], y)   # x축, y축에 둘 값, color = y(0,1)
+
+# 3. 선형 분류기를 통해 분류 시도
+from sklearn.svm import LinearSVC
+m_scv = LinearSVC()
+m_scv.fit(X,y)           # warning : n_features(설명변수) < n_samples(샘플)
+
+mglearn.plots.plot_2d_separator(m_scv, X)
+
+# 4. 3차원 데이터로 변경 후 시각화
+X[:,1] ** 2   # 두번째 컬럼의 제곱항을 추가하기 위해 가공 
+              # X[:,0], X[:,1] 변수를 활용하여 하나의 변수로 추가하기 
+              # => 3차원으로 만들어야하니 설명변수 3개( X[:,0], X[:,1],X[:,1]**2) 필요
+ 
+np.hstack([X, X[:,1]**2)       # 에러, 2차원 데이터와 1차원 데이터의 결합 불가
+np.hstack([X, X[:,1:2]**2])    # 차원축소 방지를 위한 슬라이스 색인으로 처리
+np.hstack([X, X[:,1].reshape(-1,1)**2]) 
+pd.concat([DataFrame(X), DataFrame(X[:,1]**2)], axis = 1)
+
+X_new = np.hstack([X, X[:,1:2]**2])
+
+# 시각화
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D, axes3d
+
+fig = plt.figure()
+ax = Axes3D(fig)
+
+# -- y가 0인 경우
+ax.scatter(X_new[y==0,0], X_new[y==0,1], X_new[y==0,2],
+           c = 'b', cmap = mglearn.cm2, s = 60, edgecolors='k')    # 2차원의 파란색 애들
+
+# -- y가 1인 경우
+ax.scatter(X_new[y==1,0], X_new[y==1,1], X_new[y==1,2],
+           c = 'r', cmap = mglearn.cm2, s = 60, edgecolors='k',    # 2차원의 주황 애들
+           marker = '^')
+
+
+# 5. SVM 적용
+m_scv2 = LinearSVC()
+l_svm = m_scv2.fit(X_new, y)
+
+coef = l_svm.coef_.ravel()      # SVM 모델에 의해 추정된 계수 확인(ravel:1차원으로 표현)
+intercept = l_svm.intercept_    # SVM 모델에 의해 추정된 절편 확인
+
+# 6. 초평면 시각화
+np.linspace(-3,3,100)          # -3부터 3까지 100개를 균등분할
+xx = np.linspace(X_new[:,0].min()-2, X_new[:,0].max()+2, 50)       
+yy = np.linspace(X_new[:,1].min()-2, X_new[:,1].max()+2, 50)       
+
+XX, YY = np.meshgrid(xx, yy)   # 2차원 공간안의 좌표값으로 설정
+
+coef[0] * XX + coef[1]*YY + intercept
+ZZ = (coef[0] * XX + coef[1]*YY + intercept) / -coef[2]  # 규격화, 높낮이 설정
+     
+# 시각화
+fig = plt.figure()
+ax = Axes3D(fig)
+
+ax.plot_surface(XX, YY, ZZ, alpha = 0.3)         # 평면 시각화(판 삽입)
+
+# -- y가 0인 경우
+ax.scatter(X_new[y==0,0], X_new[y==0,1], X_new[y==0,2],
+           c = 'b', cmap = mglearn.cm2, s = 60, edgecolors='k')    # 2차원의 파란색 애들
+
+# -- y가 1인 경우
+ax.scatter(X_new[y==1,0], X_new[y==1,1], X_new[y==1,2],
+           c = 'r', cmap = mglearn.cm2, s = 60, edgecolors='k',    # 2차원의 주황 애들
+           marker = '^')
+           
+# SVM 매개변수
+# - C : 데이터포인트에 대한 중요도(가중치) 제어, 클수록 높은 가중치를 부여 => 복잡한 경계 생성
+# - gamma : 결정경계를 만드는데 영향을 주는 데이터의 범위
+#           값이 커질수록 데이터의 범위를 줄임(결정경계 인근 데이터만 고려) => 복잡한 경계 생성
+            
+# 예제 - iris data 
+# 1. data loading
+from sklearn.datasets import load_iris
+iris = load_iris()
+iris_x = iris['data']
+iris_y = iris['target']
+
+# 2. modeling
+# 1) data split
+from sklearn.model_selection import train_test_split
+train_x, test_x, train_y, test_y = train_test_split(iris_x, iris_y, random_state=0)
+
+# 2) training
+from sklearn.svm import LinearSVC
+from sklearn.svm import SVC
+
+m_lsvc = LinearSVC()
+m_svc = SVC()
+
+m_lsvc.fit(train_x, train_y)
+m_svc.fit(train_x, train_y)
+
+m_lsvc.score(test_x, test_y)     # 92.1
+m_svc.score(test_x, test_y)      # 97.3
+
+m_svc.predict_proba(test_x)      # 에러발생, probability=False일때 출력 불가 => 각 클래스별 확률 출력
+
+m_svc = SVC(probability=True)
+m_svc.fit(train_x, train_y)
+m_svc.predict_proba(test_x)
+
+# 3) tuning
+# 3-1) C만 튜닝
+vscore_tr = [] ; vscore_te = []
+for i in [0.001, 0.01, 0.1, 1, 10, 100] :
+    m_svc = SVC(C=i)
+    m_svc.fit(train_x, train_y)
+    vscore_tr.append(m_svc.score(train_x, train_y))
+    vscore_te.append(m_svc.score(test_x, test_y))
+
+import matplotlib.pyplot as plt
+plt.plot(vscore_tr, label='train', c='r')
+plt.plot(vscore_te, label='test', c='b')
+plt.legend()
+plt.xticks(np.arange(0,6), [0.001, 0.01, 0.1, 1, 10, 100])
+
+# 3-2) C, gamma 동시 튜닝
+outlist = []
+for i in [0.001, 0.01, 0.1, 1, 10, 100, 1000] :
+    inlist=[]
+    for j in [0.001, 0.01, 0.1, 1, 10, 100] :
+        m_svc = SVC(C=i, gamma=j)
+        m_svc.fit(train_x, train_y)
+        inlist.append(m_svc.score(test_x, test_y))
+    outlist.append(inlist)
+    
+vscore = np.array(outlist)        
+df1 = DataFrame(vscore, index=[0.001, 0.01, 0.1, 1, 10, 100], columns=[0.001, 0.01, 0.1, 1, 10, 100])
+df1.index.name = 'C'
+df1.columns.name = 'gamma'
+
+
+# 시각화       
+import mglearn 
+from mglearn.tools import heatmap
+heatmap(values,          # 2차원 숫자 데이터
+        xlabel,          # x축 이름
+        ylabel,          # y축 이름
+        xticklabels,     # x축 눈금 이름
+        yticklabels,     # y축 눈금 이름
+        cmap)            # color map
+
+vtick = [0.001, 0.01, 0.1, 1, 10, 100]
+vheatmap = heatmap(vscore, 'gamma', 'C', vtick, vtick, cmap='viridis')           
