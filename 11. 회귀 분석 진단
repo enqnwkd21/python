@@ -1,0 +1,129 @@
+# 회귀 분석 진단
+# 1. data laoding
+from sklearn.datasets import load_boston
+boston = load_boston()
+boston.keys()
+boston_x = boston['data']
+boston_y = boston['target']
+
+boston_corr = DataFrame(boston_x, columns = boston['feature_names']).corr()
+
+# 히트맵 시각화
+import seaborn as sb
+sb.heatmap(boston_corr, annot=True, cmap='Reds')
+
+# 2. 다중공선성 확인
+# VIF = 1 / (1-R^2)
+# 10 이상이면 다중공선성 확인!
+from statsmodels.stats.outliers_influence import variance_inflation_factor as vif
+variance_inflation_factor(exog,          # 원본 데이터
+                          exog_idx       # VIF 측정하고자 하는 설명변수 위치)
+
+vvif = [ vif(boston_x, i) for i in range(boston_x.shape[1]) ]
+
+Series(vvif, index=boston['feature_names'])
+    
+# PCA + Regressor
+from sklearn.preprocessing import StandardScaler as standard
+m_sc1 = standard()
+boston_x_sc = m_sc1.fit_transform(boston_x)
+
+# PCA 변환
+from sklearn.decomposition import PCA
+
+# 주성분 수 정하기
+pca_ratio = []
+for i in range(1,13) :
+    m_pca = PCA(i)
+    boston_x_sc_pca = m_pca.fit_transform(boston_x_sc)
+    pca_ratio.append(m_pca.explained_variance_ratio_.sum())
+
+# 주성분 유도
+m_pca = PCA(6)
+boston_x_sc_pca = m_pca.fit_transform(boston_x_sc)
+df_pca = DataFrame(boston_x_sc_pca, columns = [ 'X' + i for i in np.arange(0,6).astype('str')])
+df_pca_total = pd.concat([df_pca, df2], axis=1)
+
+# 인공변수끼리의 상관관계 확인
+DataFrame(df_pca).corr()
+sb.heatmap(DataFrame(df_pca).corr(), annot=True, cmap='Reds')
+
+# 인공변수로 회귀분석 모델링
+vfm = 'PRICE ~ ' + '+'.join(df_pca.columns)
+m_lm2 = ols(vfm, data = df_pca_total).fit()
+
+m_lm2.resid     # 잔차
+print(m_lm2.summary())
+
+# VIF
+[ variance_inflation_factor(df_pca.values, i) for i in range(df_pca.shape[1])]
+
+# SVR
+from sklearn.model_selection import train_test_split
+train_x, test_x, train_y, test_y = train_test_split(df_pca, df2)
+
+from sklearn.svm import SVR
+m_svr = SVR(C=100)
+m_svr.fit(train_x, train_y)
+m_svr.score(train_x, train_y)   
+m_svr.score(test_x, test_y)   
+
+# 회귀분석의 가정 확인(검정)
+# 1) 등분산성 : 잔차가 0을 기준으로 패턴없이 널리 흩어져있는 정도 확인
+m_lm2.fittedvalues                       # 예측값, 적합값
+m_lm2.resid                              # 일반 잔차
+m_lm2.outlier_test()['student_resid']    # 스튜던트잔차(표준화된 잔차)
+
+import matplotlib.pyplot as plt
+plt.scatter(m_lm2.fittedvalues, m_lm2.resid)
+plt.scatter(m_lm2.fittedvalues, m_lm2.outlier_test()['student_resid'])
+
+# 참고 - 이상치 검정(H0 : 각 관측치가 이상치가 아니다)
+df_outlier = m_lm2.outlier_test()
+df_outlier.loc[df_outlier['bonf(p)'] < 0.05, :]
+
+# bonf(p) = Bonferroni p-value : 한번에 여러 가설검정 수행 시 p-value를 각 하나의 가설에 맞게
+#                                재계산 한 값
+
+                               
+# 2) 정규성 : 잔차가 정규분포를 따르는지 여부 확인 => 히스토그램, 커널밀도함수, qqplot, 샤피로검정
+# - 히스토그램
+v1 = np.random.normal(0, 1, 150)
+plt.hist(m_lm2.resid)             # 잔차 히스토그램
+plt.hist(v1)                      # 잔차 히스토그램
+
+# - 히스토그램 + 커널밀도함수
+import seaborn 
+seaborn.distplot(m_lm2.resid)
+seaborn.distplot(v1)
+
+# qqplot
+from scipy import stats
+stats.probplot(m_lm2.resid, plot=plt)
+stats.probplot(v1, plot=plt)
+
+# shapiro test
+# H0 : 모집단이 정규분포를 따른다
+stats.shapiro(m_lm2.resid)
+stats.shapiro(v1)
+
+# 3) 선형성 : 독립변수와 종속변수간의 일정 패턴이 존재함을 검정 => 산점도
+df1 = DataFrame(boston_x, columns = boston.feature_names)
+df2 = DataFrame(boston_y, columns = ['PRICE'])
+df_boston = pd.concat([df1,df2], axis=1)
+
+pd.plotting.scatter_matrix(df_boston, hist_kwds = {'bins' : 20})
+
+
+# 4) 잔차 자기상관성 => 잔차산점도, Durbin watson test
+print(m_lm2.summary())         # Durbin-Watson : 0.967
+
+from statsmodels.stats.stattools import durbin_watson
+durbin_watson(m_lm2.resid)     # 0.96   
+                               # 0 ~ 4의 값을 갖고, 0과 4에 가까울수록 자기상관이 강하다
+                               #                   2에 가까울수록 자기상관이 없다
+                               # => 정확한 진단은 durbin watson table 확인(n, p에 따라 달라짐)
+                               # n = 506(훈련 데이터 수), p = 13(설명변수의 개수)
+                               
+# 0        dL        dU      2       4-dU         4-dL         4
+#  자기상관    미결정     자기상관없음       미결정       자기상관
