@@ -1,0 +1,146 @@
+# 변수 변환
+# 원본 데이터로부터 보다 의미있는 변수를 가공(파생변수)
+# 로그변환, 지수변환, 거듭제곱변환, 역수변환, 교차곱
+# 예) 게임 이탈 예측 : kill/death, kill/hour, kill/games
+
+
+# interaction(교호작용, 상호작용) 효과 검증
+# 교차곱에 대해 변수변환 후 의미있는 신호가 있는지 확인
+
+# 0. 모듈 호출
+from sklearn.preprocessing import PolynomialFeatures as poly
+
+# 1. data loading
+from sklearn.datasets import load_iris
+iris = load_iris()
+iris_x = iris['data']
+iris_y = iris['target']
+
+# 2. data split
+from sklearn.model_selection import train_test_split
+train_x, test_x, train_y, test_y = train_test_split(iris_x, iris_y, random_state=0)
+
+# 3. data scaling
+from sklearn.preprocessing import StandardScaler as standard
+from sklearn.preprocessing import MinMaxScaler as minmax
+
+m_sc = standard()
+m_sc.fit(train_x)       
+train_x_sc = m_sc.transform(train_x) 
+test_x_sc = m_sc.transform(test_x)
+
+# 4. interaction
+m_poly = poly()       # degree = 2 (이차항만 고려)
+m_poly.fit(train_x)   # 발생가능한 설명변수 조합을 그려넣는 행위 확인 중 
+                      # => 설명변수의 개수는 train/test같기 때문에 test_x써도 결과는 같음
+                      # => fitting할때는 train만 하고 transform은 train/test둘다 사용 가능
+                             
+train_x_sc_poly = m_poly.transform(train_x_sc) # 위에서 확인한 변수 조합대로 실제 변수 변환 수행
+test_x_sc_poly = m_poly.transform(test_x_sc)
+
+m_poly.get_feature_names()   # 변수 조합 출력
+poly_cols = m_poly.get_feature_names(iris['feature_names'])  # 변수 조합 출력 with 설명 변수 이름까지
+
+# -- 보기 좋게 dataframe으로 만듦
+df_train_poly = DataFrame(train_x_sc_poly, columns = poly_cols)  # 첫번째 컬럼의 상수항(1)은 의미 X
+df_test_poly = DataFrame(test_x_sc_poly, columns = poly_cols)    
+
+# 5. 변수 중요도 확인
+from sklearn.ensemble import RandomForestClassifier as rf_c
+
+m_rf = rf_c()
+m_rf.fit(train_x_sc_poly, train_y)
+m_rf.score(test_x_sc_poly, test_y)  # 97.36
+
+s1 = Series(m_rf.feature_importances_, index = poly_cols)
+s1.sort_values(ascending = False)
+# -- x1 X x2 가 개별의 x1, x2보다 중요도가 높을 때 연구 필요
+# -- x1, x1 X x2, .... , x2일때도 연구 필요
+
+# [ 연습 문제 - cancer data에서의 의미있는 교차곱 형태 유무 확인 ]
+from sklearn.datasets import load_breast_cancer
+
+# 1. data loading
+cancer = load_breast_cancer()
+cancer_x = cancer['data']
+cancer_y = cancer['target']
+
+# 2. data split
+train_x, test_x, train_y, test_y = train_test_split(cancer_x, cancer_y, random_state=0)
+
+# 3. data scaling
+from sklearn.preprocessing import StandardScaler as standard
+from sklearn.preprocessing import MinMaxScaler as minmax
+
+m_sc = standard()
+m_sc.fit(train_x)
+train_x_sc = m_sc.transform(train_x)
+test_x_sc = m_sc.transform(test_x)
+
+# 4. interaction
+m_poly = poly()                                   # degree=2(이차항만 고려)
+m_poly.fit(train_x_sc)                            # 발생가능한 변수 조합 확인
+train_x_sc_poly = m_poly.transform(train_x_sc)    # 위에서 확인한 변수 조합대로 실제 변수 변환 수행
+test_x_sc_poly = m_poly.transform(test_x_sc) 
+
+m_poly.get_feature_names()
+vcols = Series(cancer['feature_names']).str.replace(' ','_')  # 변수와 곱 쉽게 식별하기 위해
+poly_cols = m_poly.get_feature_names(vcols)
+
+
+# 5. 변수 중요도 확인
+from sklearn.ensemble import RandomForestClassifier as rf_c
+
+m_rf = rf_c()
+m_rf.fit(train_x_sc_poly, train_y)
+m_rf.score(test_x_sc_poly, test_y)    # 96.50
+
+s1 = Series(m_rf.feature_importances_, index=poly_cols)
+s1.sort_values(ascending=False)
+
+# 변수 선택(feature selection)
+# 1. 필터 기법 : 모델에 의존하지 않은 상태로 변수 자체의 평가(변수 자체가 갖는 통계량 기반)로 변수를 선택/제거 방식
+# - 상관계수, 공분산, IG, gini index, entropy index, ...
+
+# 2. 래퍼 기법 : 변수의 일부를 모데링 => 결과를 토대로 변수 선택의 여부 결정
+# - 일변량 통계(단변량 선택 - univariate selection) : 변수 하나씩 종속변수와의 상관관계를 측정하여 변수를 선택하는 방식
+# - RFE : 전체 변수를 삽입하여 모델링 한 후 모델링 결과를 가지고 중요도가 낮은 변수를 제거하는 방식
+
+# 3. 임베디드 기법 : 모엘의 정확도에 기여하는 변수를 학습하여 점차 적은수의 설명변수를 갖도록 제어(규제)
+#                 - 지도학습 모델을 통해서 변수를 선택
+# - SelectFromModel : 트리기반, 회귀기반 모델을 통해 모델 자체가 갖는 변수 중요도를 파악하여 변수를 선택하는 방식
+# - 릿지, 라쏘
+
+# 예제 - iris data set을 사용한 변수 선택 과정
+
+# step1) data loading
+from sklearn.datasets import load_iris
+iris = load_iris()
+iris_x = iris['data']
+iris_y = iris['target']
+
+# step2) 잡음 데이터 추가(10개 추가)
+vrandom = np.random.RandomState(0)
+vdata = vrandom.normal(size=(150,10))
+pd.concat([DataFrame(iris_x), DataFrame(vdata)], axis = 1)   # pandas 결합 함수
+iris_total = np.hstack([iris_x, vdata])                      # numpy 결합 함수(hstack : 수평, vstack : 수직)
+
+# step3) 변수 선택(SelectFromModel)
+from sklearn.feature_selection import SelectFromModel
+m_rf = rf_c()
+m_fs = SelectFromModel(m_rf, threshold = 'mean')  # 각 변수들의 중요도를 확인하고 변수 중요도의 평균보다도 높은 애들만 고르겠다는 문법
+                                                  # threshold = '' 문법은 무조건 ~보다 높은 걸 선택->중요한 애들을 선택하는거니깐, 상위
+m_fs.fit(iris_total, iris_y)
+
+m_fs.get_support()               # 선택된 변수 확인
+iris_total[:,m_fs.get_support()] # 선택된 변수만 추출
+m_fs.transform(iris_total)       # 첫번째, 세번째, 네번째 설명 변수 추출
+
+# step4) 선택된 변수 시각화
+import matplotlib.pyplot as plt
+plt.matshow(m_fs.get_support().reshape(1,-1), cmap ='gray_r') # -- 색으로 칠해진 부분이 선택된 부분(주요한 부분)
+
+# step5) 변수 중요도 확인
+m_fs.estimator_.feature_importances_
+m_fs.estimator_.feature_importances_ > m_fs.estimator_.feature_importances_.mean() # 변수 중요도의 평균보다도 높은 애들만 고르겠다
+
