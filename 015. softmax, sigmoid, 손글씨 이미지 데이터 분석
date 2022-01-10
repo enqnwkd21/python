@@ -1,0 +1,187 @@
+import tensorflow as tf
+import keras
+
+from keras.models import Sequential
+from keras.layers.core import Dense
+from keras.utils import np_utils
+from sklearn.preprocessing import LabelEncoder
+
+# seed값 고정
+seed = 0
+np.random.seed(seed)
+tf.random.set_seed(seed)
+
+# 문자 변수를 숫자 변수로 변환하기    
+Y_test = Series(['a','b','c','d'])
+
+# 1) 사용자가 직접 변환
+Y_test.replace({'a':10, 'b':20, 'c':30, 'd':40})
+
+# 2) LabelEncoder 함수 사용
+m_lb = LabelEncoder()
+m_lb.fit_transform(Y_test)     # 숫자 변환
+
+# 3) ord 함수 사용
+ord('a')      # unique한 unicode값 리턴
+ord(Y_test)   # 벡터 연산 불가
+
+# Y를 더미 변수로 변경하기****
+pd.get_dummies([0,0,1,1])                      # default : 3개의 Y값을 3개의 Y로 분리 가능
+pd.get_dummies([0,0,1,1,2], drop_first=True)   # 3개의 Y값을 2개의 Y로 분리 가능
+
+np_utils.to_categorical([0,0,1,1,2])           # default : 3개의 Y값을 3개의 Y로 분리 가능
+np_utils.to_categorical([0,0,1,1,2], 4)        # default : 3개의 Y값을 4개의 Y로 분리 가능
+
+# 다중 분류
+# activation function : softmax(소프트맥스)
+# Y의 형태 : 분할된 형태(더미 변수) => Y의 클래스의 개수 만큼
+
+# modeling
+# 1) data loading
+from sklearn.datasets import load_iris
+iris = load_iris()
+iris_x = iris['data']
+iris_y = iris['target']
+
+# 2) scaling
+from sklearn.preprocessing import StandardScaler as standard
+m_sc = standard()
+iris_x_sc = m_sc.fit_transform(iris_x)
+
+# 3) Y split
+iris_y = np_utils.to_categorical(iris_y)
+
+# 4) model define
+model = Sequential()
+model.add(Dense(16, input_dim=4, activation='relu'))
+model.add(Dense(3, activation='softmax'))
+
+# 5) model complie
+model.compile(loss='categorical_crossentropy',
+              optimizer='adam',
+              metrics=['accuracy'])
+
+# 6) model fit
+model.fit(iris_x_sc, iris_y, epochs=50, batch_size=10)
+
+# 7) evaluate
+print('%.2f' % model.evaluate(iris_x_sc, iris_y)[1])
+
+
+# 당뇨병 예측 모델링
+df = pd.read_csv('pima-indians-diabetes.csv',
+                 names = ["pregnant", "plasma", "pressure", "thickness",  
+                 "insulin", "BMI", "pedigree", "age", "class"])
+
+dataset = df.values
+X = dataset[:,0:8]
+Y = dataset[:,8]
+
+# 이진 클래스 문제
+# - Y를 2개로 분할 학습 => loss : C.E
+#                         activation : softmax
+                        
+# - Y를 1개로 학습 => loss : B.C.E
+#                    activation : sigmoid
+
+# case1) Y를 1개의 노드로 학습
+# 모델의 설정
+model = Sequential()
+model.add(Dense(12, input_dim=8, activation='relu'))
+model.add(Dense(8, activation='relu'))
+model.add(Dense(1, activation='sigmoid'))
+
+# 모델 컴파일 
+model.compile(loss='binary_crossentropy', 
+              optimizer='adam',
+              metrics=['accuracy'])
+
+# 모델 실행
+model.fit(X, Y, epochs=200, batch_size=10)
+
+# 결과 출력 
+print("\n Accuracy: %.4f" % (model.evaluate(X, Y)[1]))
+
+# case2) Y를 2개의 노드로 학습
+# Y 분할
+Y_encoded = np_utils.to_categorical(Y)
+
+# 모델의 설정
+model = Sequential()
+model.add(Dense(12, input_dim=8, activation='relu'))
+model.add(Dense(8, activation='relu'))
+model.add(Dense(2, activation='softmax'))
+
+# 모델 컴파일 
+model.compile(loss='categorical_crossentropy', 
+              optimizer='adam',
+              metrics=['accuracy'])
+
+# 모델 실행
+model.fit(X, Y_encoded, epochs=200, batch_size=10)
+
+# 결과 출력 
+print("\n Accuracy: %.4f" % (model.evaluate(X, Y_encoded)[1]))
+
+
+# [ 손글씨 이미지 데이터 분석 ]
+# 1. data loading
+from keras.datasets import mnist
+(X_train, Y_class_train), (X_test, Y_class_test) = mnist.load_data()
+
+X_train.shape          # (60000, 28, 28)
+Y_class_train.shape    # (60000,)
+
+# 2. 이미지 시각화
+import matplotlib.pyplot as plt
+plt.imshow(X_train[0,:,:]화, cmap='Greys')    # 첫번째 이미지를 시각화
+
+# 3. data 변환(train data 기준 : 60000*28*28(3차원) => 60000*784(2차원))
+X_train_new = X_train.reshape(60000, 784)
+X_test_new = X_test.reshape(X_test.shape[0], 784)
+
+X_train_new = X_train_new.astype('float') / 255 # min-max scaling
+X_test_new  = X_test_new.astype('float') / 255  # min-max scaling
+
+Y_class_train_new = np_utils.to_categorical(Y_class_train)
+Y_class_test_new = np_utils.to_categorical(Y_class_test)
+
+# 3. modeling
+model = Sequential()
+model.add(Dense(512, input_dim=28*28, activation='relu'))
+model.add(Dense(10, activation='softmax'))
+
+model.compile(loss='categorical_crossentropy', 
+              optimizer='adam',
+              metrics=['accuracy'])
+
+# stopping rule 
+from keras.callbacks import EarlyStopping
+earlystopping = EarlyStopping(monitor='val_loss', patience=10)    
+
+# model save
+import os
+MODEL_DIR = './model/'
+
+if not os.path.exists(MODEL_DIR) :
+    os.mkdir(MODEL_DIR)
+    
+modelpath='./model/{epoch:02d}-{val_loss:.4f}.hdf5'    
+
+from keras.callbacks import ModelCheckpoint
+checkpointer = ModelCheckpoint(filepath = modelpath, monitor = 'val_loss', 
+                               save_best_only=True, verbose = 1) 
+
+model.fit(X_train_new, Y_class_train_new, epochs=1000, batch_size=10,
+          validation_split=0.25, callbacks = [earlystopping, checkpointer])
+
+
+model.evaluate(X_test_new, Y_class_test_new)[1]
+
+# [ 참고 - 모델 저장 및 저장된 모델 불러오기 ]
+from keras.models import load_model
+
+model.save('model_name.hdf5')          # 모델 저장 
+
+model2 = load_model('./model/04-0.0013.hdf5')  # 저장된 모델 불러오기
+np.round(model2.predict(X_train_new[0:1]),2)   # 5로 예상 됨
