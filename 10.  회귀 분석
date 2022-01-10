@@ -1,0 +1,118 @@
+# 회귀 분석
+# 지도 학습(Y가 연속형)
+# 인과 관계 분석
+# 통계적 가정(정규성, 등분산성, 선형성, 독립성, ...)을 필요로 하는 모델 => 어려움
+# 통계적 가정을 만족시키지 못하는 경우 회귀분석 결과 신뢰도 떨어짐
+# 통계적 모델이므로 모델에 대한 통계적 평가 메트릭 존재(R^2, 회귀계수나 모형의 유의성 검정)
+
+# 회귀분석 가정
+# 1. 선형성 : 각 설명변수와 종속변수와의 관계
+# 2. 등분산성 : 잔차(오차)의 분산이 일정 => 잔차산점도로 확인 가능!
+# 3. 정규성 : 잔차(오차)항이 정규분포를 따름 ~ N(0, sigma^2) => qqplot
+# 4. 독립성 : 잔차(오차)항이 서로 독립적이다(자기 상관이 없음) => 잔차산점도 확인
+ 
+
+# 모형의 검정(F검정)
+# H0 : 모형이 유의하지 않다
+# H1 : 모형이 유의하다
+
+# 회귀 계수의 검정(T검정)
+# H0 : b1 = 0
+# H1 : b1 != 0
+
+# 모형의 설명력
+# F검정으로 인해 모형이 유의하고 T검정 결과에서 모든 회귀 계수가 유의하더라도
+# 모형 자체가 갖는 설명력이 낮은 경우 모형 재검토 필요!
+# R^2, 수정된 R^2로 평가(주로 85% 이상)
+
+
+# [ 예제 - 보스턴 주택 가격 셋을 사용한 회귀 분석 수행 ]
+# 1. data loading
+from sklearn.datasets import load_boston
+boston = load_boston()
+boston_x = boston['data']
+boston_y = boston['target']
+
+print(boston['DESCR'])
+
+# 2. data split
+from sklearn.model_selection import train_test_split
+train_x, test_x, train_y, test_y = train_test_split(boston_x, boston_y, random_state=0)
+
+# 3. modeling
+# 1) sklearn 모듈
+from sklearn.linear_model import LinearRegression
+m_lm = LinearRegression()
+m_lm.fit(train_x, train_y)
+
+m_lm.score(train_x, train_y)    # R^2 값 리턴
+m_lm.score(test_x, test_y)      # R^2 값 리턴
+
+# 2) statsmodels 모듈
+from statsmodels.formula.api import ols
+df1 = DataFrame(boston_x, columns = boston['feature_names'])
+df2 = DataFrame(boston_y, columns = ['PRICE'])
+
+df_boston = pd.concat([df1,df2], axis=1)
+
+vfm = 'PRICE ~ ' + '+'.join(boston.feature_names)
+m_lm2 = ols(vfm, data = df_boston).fit()
+
+m_lm2.resid                           # 잔차
+print(m_lm2.summary())                # 회귀분석표
+# => INDUS, AGE 컬럼 두 변수가 유의하지 않게 나옴!!(제거 고려)
+
+
+# 3) random forest regressor
+from sklearn.ensemble import RandomForestRegressor as rf_r
+
+m_rfr = rf_r()
+m_rfr.fit(train_x, train_y)
+
+m_rfr.score(train_x, train_y)         # 98.37
+m_rfr.score(test_x, test_y)           # 76.31
+
+# SVR
+from sklearn.preprocessing import StandardScaler as stand
+m_sc = stand()
+train_x_sc = m_sc.fit_transform(train_x)
+test_x_sc = m_sc.transform(test_x)
+
+from sklearn.svm import SVR
+m_svr = SVR()
+m_svr.fit(train_x_sc, train_y)
+m_svr.score(train_x_sc, train_y)   
+m_svr.score(test_x_sc, test_y)   
+
+# tuning
+vscore_tr = [] ; vscore_te = []
+for i in [0.001, 0.01, 0.1, 1, 10, 100, 1000] :
+    m_svr = SVR(C=i)
+    m_svr.fit(train_x_sc, train_y)
+    vscore_tr.append(m_svr.score(train_x_sc, train_y))
+    vscore_te.append(m_svr.score(test_x_sc, test_y))
+
+import matplotlib.pyplot as plt
+plt.plot(vscore_tr, c='red', label='train')
+plt.plot(vscore_te, c='blue', label='test')
+plt.xticks(np.arange(0,7), [0.001, 0.01, 0.1, 1, 10, 100, 1000])
+plt.legend()
+
+# C = 100
+m_svr = SVR(C=100)
+m_svr.fit(train_x_sc, train_y)
+m_svr.score(train_x_sc, train_y)    # 97.83   
+m_svr.score(test_x_sc, test_y)      # 78.55
+
+# 변수 제거
+boston_x = df1.drop(['INDUS', 'AGE'], axis=1).values
+train_x, test_x, train_y, test_y = train_test_split(boston_x, boston_y, random_state=0)
+
+m_sc = stand()
+train_x_sc = m_sc.fit_transform(train_x)
+test_x_sc = m_sc.transform(test_x)
+
+m_svr = SVR(C=100)
+m_svr.fit(train_x_sc, train_y)
+m_svr.score(train_x_sc, train_y)    # 97.83   
+m_svr.score(test_x_sc, test_y)      # 78.55
