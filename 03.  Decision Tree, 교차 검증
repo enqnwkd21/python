@@ -1,0 +1,159 @@
+#  Decision Tree
+
+# Y가 범주형인 지도 학습
+# 트리기반 모델
+# 이상치, 결측치에 덜 민감
+# 변수 스케일링 불필요
+# 모델 내부에서 변수 중요도 측정 => 변수 선택 기준
+# 이산형(숫자지만 factor을 가지고 있음), 연속형 데이터에 대해서도 잘 동작
+
+# 0. 모듈 호출 (import sklearn.tree모듈 외우기)
+import sklearn.tree
+dir(sklearn.tree)
+from sklearn.tree import DecisionTreeClassifier as dt_c
+
+# 1. 데이터 분리
+from sklearn.model_selection import train_test_split
+train_x, test_x, train_y, test_y = train_test_split(iris['data'],  iris['target'],  random_state = 0)  
+
+# 2. 모델링 (불순도를 가장 낮게 만드는 것을 발견)
+m_dt = dt_c()
+m_dt.fit(train_x, train_y)
+m_dt.score(test_x, test_y)   # 97.37
+
+# -- 변수 산점도
+plt.scatter(iris['data'][:,2], iris['data'][:,3], c =iris['target'] )
+plt.xlabel(iris['feature_names'][2])
+plt.ylabel(iris['feature_names'][3])
+
+
+# 3. 튜닝
+# 1) max_depth
+# 2) min_samples_split : 최소 가지치기 기준(split할 수 있는 최소 기준)
+#    min_samples_split 값보다 노드의 오분류 데이터의 수가 많으면 추가 가지치기 진행 !
+#    min_samples_split 값이 낮을수록 추가 가지치기를 진행할 가능성이 높아짐에 따라 
+#    보다 복잡한 모델이 생성 (예측력 강화, 과대적합 발생 가능성 높아짐)  
+
+# 4. 변수 중요도 확인
+m_dt.feature_importances_
+
+# 5. 시각화
+# 1) graphviz 설치(window)
+# down 주소 => https://graphviz.gitlab.io/_pages/Download/Download_windows.html
+# down 후 압축해제(C:/Program Files (x86))
+
+# 2) graphviz 설치(python)
+# pip install graphviz(cmd에서 수행)
+
+# 3) python path 설정
+import os
+os.environ['PATH'] += os.pathsep + 'C:/Program Files/Graphviz/bin'
+
+import graphviz
+
+from sklearn.tree import export_graphviz
+export_graphviz(m_dt,                           # 모델명 
+                out_file="tree.dot", 
+                class_names=load_iris().target_names,
+                feature_names=load_iris().feature_names, 
+                impurity=False, 
+                filled=True)
+
+with open("tree.dot", encoding='UTF8') as f:
+    dot_graph = f.read()
+
+g1 = graphviz.Source(dot_graph)
+g1.render('dt_1', cleanup=True)
+
+
+
+# [ 연습 문제 - DT의 max_depth의 튜닝 결과를 시각화]
+train_x, test_x, train_y, test_y = train_test_split(iris['data'],  iris['target'],  random_state = 99)  
+m_dt = dt_c()
+m_dt.fit(train_x, train_y)
+m_dt.score(train_x, train_y)  # 100
+m_dt.score(test_x, test_y)    # 97.36
+
+
+score_tr = [];score_te = []
+for i in range(2, 11) :
+    m_dt = dt_c(max_depth = i)
+    m_dt.fit(train_x, train_y) 
+    score_tr.append(m_dt.score(train_x, train_y)) 
+    score_te.append(m_dt.score(test_x, test_y)) 
+    
+plt.plot(range(2, 11), score_tr, label = 'train_score', c = 'r')
+plt.plot(range(2, 11), score_te, label = 'test_score', c = 'b')
+plt.legend()
+
+m_dt = dt_c(max_depth = 3)
+m_dt.fit(train_x, train_y)
+m_dt.score(train_x, train_y)  # 98.21
+m_dt.score(test_x, test_y)
+
+# =============================================================================
+# 교차 검증 (cross validation) 
+
+# 평가점수가 계속 달라지기 때문에(원본 데이터로부터 train/test 분리하는 과정에서 랜덤하게 선택되므로)
+# 평가점수를 일반화 할 필요가 있다! => 여러번 수행 후 평균으로 최종 점수 확인
+# -- 목적 : 모델을 평가하려고 할때 원본 데이터를 train/test용으로 나누게 됩니다. 그 과정에서
+# 랜덤하게 데이터가 선택이 되면서 매 평가할 때 마다 계속 다른 데이터 셋이 적용이 되고, 따라서
+# 매 평가마다 다른 평가 점수가 나오기 때문에 이렇게 달라지는 평가 점수를 여러번 평가를 수행해서
+# 그 점수의 평균으로 일반화 시키기 위한 목적입니다.
+
+from sklearn.model_selection import cross_val_score as cv
+cv(estimator,   # 적용하려는 모델
+   X,           # 설명 변수 데이터 셋
+   y,           # 종속 변수 데이터 셋
+   cv)          # k값(교차검증 횟수, test data set의 비율 : 1/cv)
+
+# [ 예제 - cancer data를 사용한 decision tree 적용(with CV)]
+run profile1
+# 1. data loading
+cancer = pd.read_csv('cancer.csv')
+cancer_x = cancer.iloc[:,2:]
+cancer_y = cancer.iloc[:,1]
+
+# 2. data split
+from sklearn.model_selection import train_test_split
+train_x, test_x, train_y, test_y = train_test_split(cancer_x, cancer_y, random_state=0)
+
+# 3. modeling
+from sklearn.tree import DecisionTreeClassifier as dt_c
+m_dt = dt_c()
+m_dt.fit(train_x, train_y)
+m_dt.score(test_x, test_y) # 88.11 점 정말 믿을 수 있겠어? => cross validation 실행
+
+# 4. cross validation
+cv_score = cv(m_dt, cancer_x, cancer_y, cv = 5) 
+
+cv_score = cv(m_dt,        # 적용하려는 모델
+              cancer_x,    # 설명 변수 데이터 셋(train_x는 내가 나눈 것)
+              cancer_y,    # 종속 변수 데이터 셋
+              cv = 5) 
+
+cv_score.mean()            # 91.56 이 5번 실행 후의 평균 => 88.11 보다 신뢰가는 점수
+
+# 5. max_depth 튜닝(with CV)
+# step1) train/test split
+train_x, test_x, train_y, test_y = train_test_split(cancer_x, cancer_y, random_state=0)
+
+# step2) max_depth 튜닝 과정에서 평가 진행 시 train data set 으로 교차 검증 수행
+vscore = []
+for i in range(2, 11) :
+    m_dt = dt_c(max_depth = i)
+    cv_score = cv(m_dt, train_x, train_y, cv = 3)   # validation score = train data set을 또 3분할(3번 반복) 
+                                                    # => val 점수만 알려줌 train 점수 모름 -> 과대적합 못 봄
+                                                    # validation data set은 max_depth가 적정한지를 보기 위한 data set
+    vscore.append(cv_score.mean())    # max_depth 변화에 따른 최종 점수
+    
+    
+plt.plot(range(2, 11), vscore)
+
+# step3) 일반화 된 튜닝과정에서의 평가점수를 토대로 best parameter 결정
+m_dt = dt_c(max_depth = 6)
+
+# step4) 최종 평가 : 원래의 train data set(best parameter 반영, validation data set이 이미 포함되어있음) 으로
+#        훈련 후 test data set 으로 최종 평가 수행
+m_dt.fit(train_x, train_y)
+m_dt.score(test_x, test_y)
