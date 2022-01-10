@@ -1,0 +1,208 @@
+# 차원 축소
+# 단순히 변수를 제거하는 것이 아니라(제거된 변수의 정보를 사용하지 않겠다는 의미)
+# 기존 변수를 모두 활용하여(기존 변수의 정보를 모두 사용)
+# 새로운 의미있는 인공변수를 유도(유도되는 인공변수의 수가 원래의 차원의 수보다 줄어드는 상황)
+# 2차원, 3차원 공간안에 전체 데이터의 분포를 시각화 목적
+# 차원축소 전에는 반드시 스케일링이 필요
+
+# 1. 주성분분석(PCA) - 의미 있는 변수들의 가공
+# - 기존 데이터들이 갖는 분산에 집중하여 분산을 유지하는 방식의 변수 결합
+# - 첫번째 유도되는 인공변수(주성분)가 기존 데이터의 분산을 가장 많이 설명
+# - 두번째 유도되는 인공변수는 첫번째 주성분이 설명하지 못한 분산에 대해 설명
+# - 회귀분석의 다중공선성의 문제를 해결하기 위한 용도로도 자주 등장
+# - 주성분 수 결정 : 분산설명력이 80% 이상이 되는 주성분의 수 확인
+# - 단점 : 유도된 인공변수의 해석이 어려움
+
+# c1 : 68%
+# c2 : 6%
+# c3 : 4%
+# c4 : 1%
+# ==> 누적 분산 설명력이 c3까지 오면 80% 이상이 되기 때문에 유도된 인공변수 3개 선택
+
+# [ 예제 - iris data 차원 축소 (PCA)]
+# 1. data loading 
+from sklearn.datasets import load_iris
+iris = load_iris()
+iris_x = iris['data']
+iris_y = iris['target']
+
+# 2. data scaling
+from sklearn.preprocessing import StandardScaler as standard
+m_sc = standard()     
+iris_x_sc = m_sc.fit_transform(iris_x) 
+
+# 3. PCA(비지도학습)
+from sklearn.decomposition import PCA
+m_pca = PCA(n_components = 2)                # 2개 인공변수 유도 (빈 모델)
+m_pca.fit(iris_x_sc)                         # 인공변수 유도 식 계산 (비지도 학습(Y값 입력X), 분산 설명력)  
+iris_x_sc_pca = m_pca.transform(iris_x_sc)   # 계산된 수식으로 실제 변수 변환(4개를 2개 인공변수로 바꾼 결과)
+
+# 유도된 인공변수 확인
+# 1) 각 계수 확인
+m_pca.components_
+# array([[ 0.52106591, -0.26934744,  0.5804131 ,  0.56485654],
+#        [ 0.37741762,  0.92329566,  0.02449161,  0.06694199]])
+
+# 2) 위 계수에 의해 추정된 인공변수 유도식 PCA(n_components = 2)라고 지정했으니 2행, IRIS설명변수가 4개니, 2X4
+# C1 = 0.52106591*X1 + -0.26934744*X2 + 0.5804131*X3  + 0.56485654*X4
+# C2 = 0.37741762*X1 +    92329566*X2 + 0.02449161*X3 + 0.06694199*X4
+
+# 3) 위 식에 의해 변환된 데이터 셋
+iris_x_sc[0,:] => iris_x_sc_pca[0,:]
+
+0.52106591*iris_x_sc[0,0] +  -0.26934744*iris_x_sc[0,1] + 0.5804131*iris_x_sc[0,2] +  0.56485654*iris_x_sc[0,3]
+= -2.264702813233667 = iris_x_sc_pca[0,0]
+
+0.37741762*iris_x_sc[0,0] +  0.92329566*iris_x_sc[0,1] + 0.02449161*iris_x_sc[0,2] +  0.06694199*iris_x_sc[0,3]
+= 0.48002658778021806 = iris_x_sc_pca[0,1]
+
+# 4. 시각화
+import mglearn
+mglearn.discrete_scatter(iris_x_sc_pca[:,0], iris_x_sc_pca[:,1], y = iris_y)
+
+
+# [ 예제 - iris data 차원 축소(PCA) ]
+# 1. data loading
+from sklearn.datasets import load_iris
+iris = load_iris()
+iris_x = iris['data']
+iris_y = iris['target']
+
+# 2. data scaling
+from sklearn.preprocessing import StandardScaler as standard
+m_sc = standard()
+iris_x_sc = m_sc.fit_transform(iris_x)
+
+# 3. PCA
+from sklearn.decomposition import PCA
+m_pca = PCA(n_components=3)                        # 2개 인공변수 유도
+m_pca.fit(iris_x_sc)                               # 인공변수 유도 식 계산
+iris_x_sc_pca = m_pca.transform(iris_x_sc)         # 계산된 수식으로 실제 변수 변환
+
+# 유도된 인공변수 확인
+# 1) 각 계수 확인
+m_pca.components_
+
+
+# 유도된 인공변수의 분산 설명력
+m_pca.explained_variance_
+m_pca.explained_variance_ratio_      # 유도된 각 인공변수의 설명력(%)
+                                     # 첫번째와 두번째 인공변수로 이미 80%이상의 분산설명력을 보이므로
+                                     # iris data를 PCA에 의해 의미 있는 인공변수를 유도할 경우 2개로 충분
+
+# 4. 시각화
+from mpl_toolkits.mplot3d import Axes3D, axes3d
+pig1 = plt.figure()
+ax = Axes3D(pig1)
+
+ax.scatter(iris_x_sc_pca[:,0],     # x축 좌표
+           iris_x_sc_pca[:,1],     # y축 좌표
+           iris_x_sc_pca[:,2],     # z축 좌표
+           c = iris_y,             # 색 표현(Y마다 다른 색)
+           cmap = plt.spring(),    # 색 색깔(어떤색이냐, 팔레트)
+           s = 60,                 # 점 크기
+           edgecolors = 'k'        # 점 테두리 색
+           )
+
+# [ 연습 문제 - cancer data set을 사용하여 PCA로 유도된 인공변수로 2,3차원 시각화 ]
+# 1. data loading
+from sklearn.datasets import load_breast_cancer
+cancer = load_breast_cancer()
+cancer_x = cancer['data']
+cancer_y = cancer['target']
+
+# 2. data scaling
+from sklearn.preprocessing import StandardScaler as standard
+m_sc = standard()
+cancer_x_sc = m_sc.fit_transform(cancer_x)
+
+# 3. PCA
+from sklearn.decomposition import PCA
+m_pca1 = PCA(n_components=2)                        
+m_pca2 = PCA(n_components=3)  
+
+m_pca1.fit(cancer_x_sc)  
+m_pca2.fit(cancer_x_sc) 
+                            
+cancer_x_sc_pca1 = m_pca1.transform(cancer_x_sc)     
+cancer_x_sc_pca2 = m_pca2.transform(cancer_x_sc)     
+
+# 유도된 인공변수 확인
+# 1) 각 계수 확인
+m_pca1.components_
+m_pca2.components_
+
+
+# 유도된 인공변수의 분산 설명력
+m_pca1.explained_variance_ratio_     
+m_pca2.explained_variance_ratio_                                   
+
+
+# 4. 시각화
+# 1) 2차원 시각화
+import mglearn
+mglearn.discrete_scatter(cancer_x_sc_pca1[:,0], cancer_x_sc_pca1[:,1], y = cancer_y)
+
+
+# 2) 3차원 시각화
+from mpl_toolkits.mplot3d import Axes3D, axes3d
+pig1 = plt.figure()
+ax = Axes3D(pig1)
+
+ax.scatter(cancer_x_sc_pca2[:,0],     # x축 좌표
+           cancer_x_sc_pca2[:,1],     # y축 좌표
+           cancer_x_sc_pca2[:,2],     # z축 좌표
+           c = cancer_y,             # 색 표현(Y마다 다른 색)
+           cmap = plt.spring(),      # 색 색깔(어떤색이냐, 팔레트)
+           s = 60,                   # 점 크기
+           edgecolors = 'k'          # 점 테두리 색
+           )
+
+
+# [ 연습 문제 - PCA + knn ]
+from sklearn.neighbors import KNeighborsClassifier as knn
+
+# 1. data loading
+from sklearn.datasets import load_breast_cancer
+cancer = load_breast_cancer()
+cancer_x = cancer['data']
+cancer_y = cancer['target']
+
+# 2. data scaling
+from sklearn.preprocessing import StandardScaler as standard
+m_sc = standard()
+cancer_x_sc = m_sc.fit_transform(cancer_x)
+
+# 3. PCA
+from sklearn.decomposition import PCA
+m_pca = PCA(n_components=30)                        
+m_pca.fit(cancer_x_sc)                            
+cancer_x_sc_pca = m_pca.transform(cancer_x_sc)  
+
+m_pca.explained_variance_ratio_.cumsum()       # 각 인공변수 설명력의 누적합
+   
+# 4. knn 모델링
+from sklearn.neighbors import KNeighborsClassifier as knn
+# 5개의 인공변수 유도
+m_pca = PCA(n_components=5)
+m_pca.fit(cancer_x_sc)                            
+cancer_x_sc = m_pca.transform(cancer_x_sc)  
+
+# 데이터분리(5개의 인공변수를 선택한 후, 데이터 분리)
+from sklearn.model_selection import train_test_split
+train_x, test_x, train_y, test_y = train_test_split(cancer_x_sc, cancer_y, random_state = 0)
+
+# 모델 훈련 및 평가
+m_knn = knn()
+m_knn.fit(train_x, train_y)
+m_knn.score(test_x, test_y)   # 93.00
+
+# --
+# 분산은 제곱이 된 상태이기 때문에 개별 숫자의 평균으로부터의 편차가 클수록 더 커지는 효과를 주게된다. 
+# 즉, 평균에서 거리가 더 먼 숫자일 수록 편차에 더 가중치를 주어
+# 계산된 상태가 되는 이는 데이터분석에서 데이터의 분포나 패턴을 볼 때 더 뚜렷하게 볼 수 있게 해주기도 한다.
+
+# 다중공선성의 문제
+# 원인 : 설명변수끼리의 상관성
+# 문제 : 회귀분석의 결과 신뢰도 떨어짐(유도된 계수 크기 부정확, 부호가 반대)
+# 해결 : 변수제거, 변수결합, PCA, 릿지, 라쏘, ...
