@@ -1,0 +1,163 @@
+# iris data set을 사용한 변수 선택 과정
+
+# =============================================================================
+# 1. 일변량 선택
+# 변수 하나와 종속변수와의 관계를 파악하여 변수를 선택하는 방식
+# 다른 변수와 함께 학습되는 경우를 고려하지 못하여 전체 학습 결과와 다른 결과가 나올 수 있음
+# 가장 간단한 방식, 연산 속도가 가장 빠름
+# 상관계수, 불순도 척도(gini index, entropy index, IG, 카이제곱통계량)
+
+# step1) data loading
+from sklearn.datasets import load_iris
+iris = load_iris()
+iris_x = iris['data']
+iris_y = iris['target']
+
+# step2) 잡음 데이터 추가(10개 추가)
+vrandom = np.random.RandomState(0)
+vdata = vrandom.normal(size=(150,10))
+pd.concat([DataFrame(iris_x), DataFrame(vdata)], axis = 1)   # pandas 결합 함수
+iris_total = np.hstack([iris_x, vdata])                      # numpy 결합 함수(hstack : 수평, vstack : 수직)
+
+# step3) 변수 선택(SelectKBest, SelectPercentile)
+from sklearn.feature_selection import SelectKBest, SelectPercentile
+
+m_fs = SelectKBest(k=4)          # 가장 베스트 조합의 4개 변수 선택, default가 10개 선택(k=10)
+m_fs.fit(iris_total, iris_y)
+
+m_fs.get_support()               # 선택된 변수 확인 
+iris_total[:,m_fs.get_support()] # 선택된 변수만 추출
+m_fs.transform(iris_total)       # 첫번째, 세번째, 네번째 설명 변수 추출
+
+# step4) 선택된 변수 시각화
+import matplotlib.pyplot as plt
+plt.matshow(m_fs.get_support().reshape(1,-1), cmap ='gray_r') # -- 색으로 칠해진 부분이 선택된 부분(주요한 부분)
+plt.rc('axes', unicode_minus=False)                           # -- 마이너스 기호 깨짐 현상 없애기
+
+# step5) 변수 중요도 확인
+m_fs.scores_
+
+# =============================================================================
+# 2. 모델 기반 선택(임베디드 기법)
+# 지도학습 머신러닝 모델을 사용하여 변수 선택
+# 일변량 분석과는 다르게 모든 특성(변수)을 고려하므로 변수들간의 상호 관계 반영
+# 일변량 선택 기법보다는 내부 연산 과정 복잡, 더 많은 시간 소요
+# 트리기반 모델 선택 시 변수 중요도를 측정, 회귀기반 모델 선택 시 회귀 계수를 측정 
+
+# step1) data loading
+from sklearn.datasets import load_iris
+iris = load_iris()
+iris_x = iris['data']
+iris_y = iris['target']
+
+# step2) 잡음 데이터 추가(10개 추가)
+vrandom = np.random.RandomState(0)
+vdata = vrandom.normal(size=(150,10))
+pd.concat([DataFrame(iris_x), DataFrame(vdata)], axis = 1)   # pandas 결합 함수
+iris_total = np.hstack([iris_x, vdata])                      # numpy 결합 함수(hstack : 수평, vstack : 수직)
+
+# step3) 변수 선택(SelectFromModel)
+from sklearn.feature_selection import SelectFromModel
+from sklearn.ensemble import RandomForestClassifier as rf_c
+m_rf = rf_c()
+m_fs = SelectFromModel(m_rf, threshold = 'mean')  # 각 변수들의 중요도를 확인하고 변수 중요도의 평균보다도 높은 애들만 고르겠다는 문법
+                                                  # threshold = '' 문법은 무조건 ~보다 높은 걸 선택->중요한 애들을 선택하는거니깐, 상위
+m_fs.fit(iris_total, iris_y)
+
+m_fs.get_support()               # 선택된 변수 확인
+iris_total[:,m_fs.get_support()] # 선택된 변수만 추출
+m_fs.transform(iris_total)       # 첫번째, 세번째, 네번째 설명 변수 추출
+
+# step4) 선택된 변수 시각화
+import matplotlib.pyplot as plt
+plt.matshow(m_fs.get_support().reshape(1,-1), cmap ='gray_r') # -- 색으로 칠해진 부분이 선택된 부분(주요한 부분)
+
+
+# step5) 변수 중요도 확인
+m_fs.estimator_.feature_importances_
+m_fs.estimator_.feature_importances_ > m_fs.estimator_.feature_importances_.mean() # 변수 중요도의 평균보다도 높은 애들만 고르겠다
+
+
+# =============================================================================
+# 3. RFE(Recursive Feature Elimination):래퍼 기법(모델기반)
+
+# step1) data loading
+from sklearn.datasets import load_iris
+iris = load_iris()
+iris_x = iris['data']
+iris_y = iris['target']
+
+# step2) 잡음 데이터 추가(10개 추가)
+vrandom = np.random.RandomState(0)
+vdata = vrandom.normal(size=(150,10))
+pd.concat([DataFrame(iris_x), DataFrame(vdata)], axis = 1)   # pandas 결합 함수
+iris_total = np.hstack([iris_x, vdata])                      # numpy 결합 함수(hstack : 수평, vstack : 수직)
+
+# step3) 변수 선택(RFE)
+from sklearn.feature_selection import RFE
+from sklearn.ensemble import RandomForestClassifier as rf_c
+m_rf = rf_c()
+m_fs = RFE(m_rf, n_features_to_select=4)    # 4개 변수 선택
+m_fs.fit(iris_total, iris_y)
+
+m_fs.get_support()               # 선택된 변수 확인
+iris_total[:,m_fs.get_support()] # 선택된 변수만 추출
+m_fs.transform(iris_total)      
+
+# step4) 선택된 변수 시각화
+import matplotlib.pyplot as plt
+plt.matshow(m_fs.get_support().reshape(1,-1), cmap ='gray_r') # -- 색으로 칠해진 부분이 선택된 부분(주요한 부분)
+
+
+# step5) 변수 중요도 확인
+m_fs.estimator_.feature_importances_
+m_fs.ranking_
+
+
+
+# [ 연습 문제 - cancer data에서의 중요 변수 확인(순위) ]
+# 1. data loading
+from sklearn.datasets import load_breast_cancer
+cancer = load_breast_cancer()
+cancer_x = cancer['data']
+cancer_y = cancer['target']
+                    
+# 2. feature selection
+from sklearn.feature_selection import SelectFromModel, SelectKBest, SelectPercentile, RFE
+from sklearn.ensemble import RandomForestClassifier as rf_c
+
+# -- 모델 생성
+m_fs1 = SelectKBest(k=15)  
+m_fs2 = SelectFromModel(rf_c(), threshold = 'mean') 
+m_fs3 = RFE(rf_c(), n_features_to_select=30)   # 전체 순위를 보고싶기 때문에 전체(30) 
+
+# -- 데이터 훈련
+m_fs1.fit(cancer_x, cancer_y) 
+m_fs2.fit(cancer_x, cancer_y)
+m_fs3.fit(cancer_x, cancer_y)
+
+# -- 변수 중요도(score)확인
+vscore1 = Series(m_fs1.scores_, index = cancer['feature_names'])
+vscore2 = Series(m_fs2.estimator_.feature_importances_, index = cancer['feature_names'])
+vscore3 = Series(m_fs3.estimator_.feature_importances_, index = cancer['feature_names'])
+
+# -- 순위 매기기
+vrank1 = vscore1.rank(ascending = False).astype('int').reset_index()
+vrank2 = vscore2.rank(ascending = False).astype('int').reset_index()
+vrank3 = vscore3.rank(ascending = False).astype('int').reset_index()
+
+# -- 컬럼 이름 수정
+vrank1.columns =['feature_name', 'rank']
+vrank2.columns =['feature_name', 'rank']
+vrank3.columns =['feature_name', 'rank']
+
+# -- 순위 기반 조인
+imsi = pd.merge(vrank1, vrank2, on = 'rank')
+total = pd.merge(imsi, vrank3, on = 'rank')
+
+# -- 데이터프레임 한번에 보기 
+rank_total = total.sort_values(by = 'rank').iloc[:,[0,2,3]]
+rank_total.columns = ['일변량','모델기반','RFE']
+
+# -- 인덱스 : rownumber -> 순위(1~30)으로 수정
+rank_total.index = np.arange(1,31)
